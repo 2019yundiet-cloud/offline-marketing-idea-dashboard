@@ -18,7 +18,7 @@ create table if not exists public.offline_marketing_ideas (
   constraint offline_marketing_ideas_store_check
     check (store = '' or store in ('머문래', '갤러리문래')),
   constraint offline_marketing_ideas_owner_check
-    check (owner = '' or owner in ('준호', '동원', '보미')),
+    check (owner = '' or owner in ('준호', '동원', '보미', '상준')),
   constraint offline_marketing_ideas_status_check
     check (status in ('idea', 'discussion', 'planning', 'progress', 'done')),
   constraint offline_marketing_ideas_priority_check

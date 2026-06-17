@@ -16,7 +16,7 @@ Open the local URL printed by the server.
 - The server writes to `data/dashboard-ideas.json` first.
 - If Supabase credentials exist in `.env`, the same row is upserted into `offline_marketing_ideas`.
 - The browser never receives the Supabase service role key.
-- Fixed users: 준호, 동원, 보미.
+- Fixed users: 준호, 동원, 보미, 상준.
 - Fixed stores: 머문래, 갤러리문래.
 - Fixed stages: 아이디어, 논의, 상세기획, 진행, 완료.
 

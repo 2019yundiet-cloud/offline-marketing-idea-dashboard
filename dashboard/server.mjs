@@ -12,7 +12,7 @@ const publicDir = path.join(__dirname, 'public');
 const dataDir = path.join(repoRoot, 'data');
 const ideasFile = path.join(dataDir, 'dashboard-ideas.json');
 
-const USERS = ['준호', '동원', '보미'];
+const USERS = ['준호', '동원', '보미', '상준'];
 const STORES = ['머문래', '갤러리문래'];
 const STATUSES = ['idea', 'discussion', 'planning', 'progress', 'done'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
