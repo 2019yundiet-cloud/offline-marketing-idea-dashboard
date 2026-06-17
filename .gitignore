@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Node/runtime
+node_modules/
+npm-debug.log*
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+supabase/.env.*
+
+# Obsidian volatile local state
+offline-marketing-graph/.obsidian/workspace.json
+offline-marketing-graph/.obsidian/workspace-mobile.json
+offline-marketing-graph/.obsidian/cache/
+offline-marketing-graph/.obsidian/plugins/*/data.json
+
+# Generated exports and temporary sync output
+exports/
+tmp/
+data/*.json
+*.tmp
+*.bak

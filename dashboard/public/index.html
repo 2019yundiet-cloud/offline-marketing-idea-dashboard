@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#ffffff">
+    <title>오프라인 마케팅 아이디어 대시보드</title>
+    <link rel="icon" type="image/svg+xml" href="financier.svg">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark"><img src="financier.svg" alt=""></span>
+          <div>
+            <h1>아이디어 관리</h1>
+            <p>준호 · 동원 · 보미</p>
+          </div>
+        </div>
+        <nav class="nav-list" aria-label="대시보드">
+          <a href="#input" class="active">아이디어</a>
+          <a href="#overview">요약</a>
+          <a href="#records">목록</a>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Auto Save</p>
+            <h2>아이디어 보드</h2>
+          </div>
+          <div class="status-strip" aria-live="polite">
+            <span id="storageMode">확인 중</span>
+            <span id="saveStatus" class="status-pill idle">대기</span>
+          </div>
+        </header>
+
+        <section id="overview" class="metric-grid" aria-label="아이디어 요약">
+          <article class="metric">
+            <span>아이디어</span>
+            <strong id="metricIdea">0</strong>
+          </article>
+          <article class="metric">
+            <span>논의</span>
+            <strong id="metricDiscussion">0</strong>
+          </article>
+          <article class="metric">
+            <span>상세기획</span>
+            <strong id="metricPlanning">0</strong>
+          </article>
+          <article class="metric">
+            <span>진행</span>
+            <strong id="metricProgress">0</strong>
+          </article>
+          <article class="metric">
+            <span>완료</span>
+            <strong id="metricDone">0</strong>
+          </article>
+        </section>
+
+        <section class="stage-tabs" id="stageTabs" aria-label="단계 필터">
+          <button type="button" data-stage="all" class="active">
+            <span>전체</span>
+            <strong>0</strong>
+          </button>
+          <button type="button" data-stage="idea">
+            <span>아이디어</span>
+            <strong>0</strong>
+          </button>
+          <button type="button" data-stage="discussion">
+            <span>논의</span>
+            <strong>0</strong>
+          </button>
+          <button type="button" data-stage="planning">
+            <span>상세기획</span>
+            <strong>0</strong>
+          </button>
+          <button type="button" data-stage="progress">
+            <span>진행</span>
+            <strong>0</strong>
+          </button>
+          <button type="button" data-stage="done">
+            <span>완료</span>
+            <strong>0</strong>
+          </button>
+        </section>
+
+        <section id="input" class="input-layout">
+          <form id="ideaForm" class="entry-form" autocomplete="off">
+            <div class="form-header">
+              <h3>아이디어 입력</h3>
+              <button type="button" id="newIdeaButton">새 아이디어</button>
+            </div>
+
+            <div class="form-grid">
+              <label class="wide">
+                <span>아이디어 제목</span>
+                <input name="title" type="text" placeholder="예: 머문래 점심시간 샘플링 이벤트">
+              </label>
+              <label>
+                <span>매장</span>
+                <select name="store">
+                  <option value="">선택</option>
+                  <option value="머문래">머문래</option>
+                  <option value="갤러리문래">갤러리문래</option>
+                </select>
+              </label>
+              <label>
+                <span>담당자</span>
+                <select name="owner">
+                  <option value="">선택</option>
+                  <option value="준호">준호</option>
+                  <option value="동원">동원</option>
+                  <option value="보미">보미</option>
+                </select>
+              </label>
+              <label>
+                <span>상태</span>
+                <select name="status">
+                  <option value="idea">아이디어</option>
+                  <option value="discussion">논의</option>
+                  <option value="planning">상세기획</option>
+                  <option value="progress">진행</option>
+                  <option value="done">완료</option>
+                </select>
+              </label>
+              <label>
+                <span>우선순위</span>
+                <select name="priority">
+                  <option value="medium">보통</option>
+                  <option value="high">높음</option>
+                  <option value="urgent">긴급</option>
+                  <option value="low">낮음</option>
+                </select>
+              </label>
+              <label>
+                <span>유형</span>
+                <select name="idea_type">
+                  <option value="">선택</option>
+                  <option value="프로모션">프로모션</option>
+                  <option value="이벤트">이벤트</option>
+                  <option value="제휴">제휴</option>
+                  <option value="콘텐츠">콘텐츠</option>
+                  <option value="매장운영">매장운영</option>
+                  <option value="고객경험">고객경험</option>
+                </select>
+              </label>
+              <label>
+                <span>태그</span>
+                <input name="tags" type="text" placeholder="쉼표로 구분">
+              </label>
+              <label class="wide">
+                <span>아이디어 내용</span>
+                <textarea name="description" rows="6" placeholder="아이디어의 배경, 장면, 고객 반응 가설"></textarea>
+              </label>
+              <label class="wide">
+                <span>기대 효과</span>
+                <textarea name="expected_impact" rows="3" placeholder="유입, 구매, 재방문, 리뷰 등 기대하는 효과"></textarea>
+              </label>
+              <label class="wide">
+                <span>다음 액션</span>
+                <textarea name="next_action" rows="3" placeholder="누가 무엇을 언제까지 할지"></textarea>
+              </label>
+            </div>
+          </form>
+
+          <section class="side-panel" aria-label="현재 아이디어">
+            <h3>현재 저장값</h3>
+            <dl class="snapshot">
+              <div><dt>저장 ID</dt><dd id="snapshotId">-</dd></div>
+              <div><dt>마지막 저장</dt><dd id="snapshotUpdated">-</dd></div>
+              <div><dt>저장 위치</dt><dd id="snapshotStorage">-</dd></div>
+              <div><dt>운영 매장</dt><dd>머문래 · 갤러리문래</dd></div>
+              <div><dt>사용자</dt><dd>준호 · 동원 · 보미</dd></div>
+            </dl>
+          </section>
+        </section>
+
+        <section id="records" class="records-section">
+          <div class="section-heading">
+            <h3>아이디어 목록</h3>
+            <span id="recordCount">0개</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>제목</th>
+                  <th>매장</th>
+                  <th>담당자</th>
+                  <th>상태</th>
+                  <th>우선순위</th>
+                  <th>유형</th>
+                  <th>수정일</th>
+                </tr>
+              </thead>
+              <tbody id="ideasBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+    <nav class="mobile-tabbar" aria-label="모바일 대시보드">
+      <a href="#input">입력</a>
+      <a href="#overview">요약</a>
+      <a href="#records">목록</a>
+    </nav>
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

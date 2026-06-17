@@ -1,0 +1,14 @@
+{
+  "name": "offline-marketing-files",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dashboard": "node dashboard/server.mjs",
+    "dashboard:check": "node --check dashboard/server.mjs && node --check dashboard/public/app.js",
+    "vault:check": "node scripts/sync-vault-to-supabase.mjs --check",
+    "vault:sync:dry": "node scripts/sync-vault-to-supabase.mjs --dry-run",
+    "vault:sync": "node scripts/sync-vault-to-supabase.mjs",
+    "git:offline-status": "git status --short -- offline-marketing-graph dashboard data supabase scripts docs README.md package.json .gitignore .gitattributes .env.example"
+  }
+}

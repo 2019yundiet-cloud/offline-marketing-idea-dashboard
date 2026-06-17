@@ -1,0 +1,16 @@
+*.md text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.sql text eol=lf
+*.mjs text eol=lf
+*.sh text eol=lf
+*.canvas text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.pdf binary
+*.xlsx binary
+*.csv text eol=lf

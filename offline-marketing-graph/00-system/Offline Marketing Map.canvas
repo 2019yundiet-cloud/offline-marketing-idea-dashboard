@@ -1,0 +1,166 @@
+{
+  "nodes": [
+    {
+      "id": "home",
+      "type": "file",
+      "file": "Home.md",
+      "x": 0,
+      "y": 0,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "model",
+      "type": "file",
+      "file": "00-system/Data Model.md",
+      "x": -360,
+      "y": -230,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "sources",
+      "type": "file",
+      "file": "01-sources/Source Registry.md",
+      "x": -360,
+      "y": 20,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "campaigns",
+      "type": "file",
+      "file": "02-campaigns/Campaign Index.md",
+      "x": 360,
+      "y": -230,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "locations",
+      "type": "file",
+      "file": "03-locations/Location Index.md",
+      "x": 720,
+      "y": -20,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "partners",
+      "type": "file",
+      "file": "04-partners/Partner Index.md",
+      "x": 360,
+      "y": 220,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "assets",
+      "type": "file",
+      "file": "05-assets/Asset Index.md",
+      "x": 0,
+      "y": 280,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "events",
+      "type": "file",
+      "file": "06-events/Field Event Index.md",
+      "x": 720,
+      "y": 220,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "results",
+      "type": "file",
+      "file": "06-results/Metric Dashboard.md",
+      "x": -360,
+      "y": 280,
+      "width": 300,
+      "height": 180
+    },
+    {
+      "id": "insights",
+      "type": "file",
+      "file": "08-insights/Insight Index.md",
+      "x": 0,
+      "y": -460,
+      "width": 300,
+      "height": 180
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-home-model",
+      "fromNode": "home",
+      "fromSide": "left",
+      "toNode": "model",
+      "toSide": "right"
+    },
+    {
+      "id": "e-home-campaigns",
+      "fromNode": "home",
+      "fromSide": "right",
+      "toNode": "campaigns",
+      "toSide": "left"
+    },
+    {
+      "id": "e-campaigns-locations",
+      "fromNode": "campaigns",
+      "fromSide": "right",
+      "toNode": "locations",
+      "toSide": "left"
+    },
+    {
+      "id": "e-campaigns-partners",
+      "fromNode": "campaigns",
+      "fromSide": "bottom",
+      "toNode": "partners",
+      "toSide": "top"
+    },
+    {
+      "id": "e-campaigns-assets",
+      "fromNode": "campaigns",
+      "fromSide": "bottom",
+      "toNode": "assets",
+      "toSide": "top"
+    },
+    {
+      "id": "e-campaigns-events",
+      "fromNode": "campaigns",
+      "fromSide": "right",
+      "toNode": "events",
+      "toSide": "top"
+    },
+    {
+      "id": "e-events-results",
+      "fromNode": "events",
+      "fromSide": "left",
+      "toNode": "results",
+      "toSide": "right"
+    },
+    {
+      "id": "e-results-sources",
+      "fromNode": "results",
+      "fromSide": "left",
+      "toNode": "sources",
+      "toSide": "bottom"
+    },
+    {
+      "id": "e-insights-campaigns",
+      "fromNode": "insights",
+      "fromSide": "bottom",
+      "toNode": "campaigns",
+      "toSide": "top"
+    },
+    {
+      "id": "e-insights-results",
+      "fromNode": "insights",
+      "fromSide": "left",
+      "toNode": "results",
+      "toSide": "top"
+    }
+  ]
+}
