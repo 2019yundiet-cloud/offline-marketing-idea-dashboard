@@ -148,10 +148,27 @@
                   <option value="고객경험">고객경험</option>
                 </select>
               </label>
-              <label>
-                <span>태그</span>
-                <input name="tags" type="text" placeholder="쉼표로 구분">
-              </label>
+              <fieldset class="tag-field">
+                <legend>태그</legend>
+                <div class="tag-options" aria-label="태그 선택">
+                  <label>
+                    <input name="tags" type="checkbox" value="메뉴">
+                    <span>메뉴</span>
+                  </label>
+                  <label>
+                    <input name="tags" type="checkbox" value="인테리어">
+                    <span>인테리어</span>
+                  </label>
+                  <label>
+                    <input name="tags" type="checkbox" value="온라인마케팅">
+                    <span>온라인마케팅</span>
+                  </label>
+                  <label>
+                    <input name="tags" type="checkbox" value="오프라인 마케팅">
+                    <span>오프라인 마케팅</span>
+                  </label>
+                </div>
+              </fieldset>
               <label class="wide">
                 <span>아이디어 내용</span>
                 <textarea name="description" rows="6" placeholder="아이디어의 배경, 장면, 고객 반응 가설"></textarea>

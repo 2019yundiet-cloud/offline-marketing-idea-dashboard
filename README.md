@@ -25,6 +25,7 @@ npm run git:offline-status
 Run `npm run dashboard` and open the printed local URL. Every changed idea field is saved automatically through the dashboard API. The API writes to `data/dashboard-ideas.json` first, then syncs to Supabase when `.env` contains `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 
 Dashboard users are fixed to 준호, 동원, 보미, 상준. Stores are fixed to 머문래 and 갤러리문래.
+Dashboard tags are fixed to 메뉴, 인테리어, 온라인마케팅, 오프라인 마케팅.
 
 ## Git Scope
 

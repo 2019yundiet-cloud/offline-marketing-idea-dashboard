@@ -154,7 +154,7 @@ function collectIdea() {
     description: data.get('description') || '',
     expected_impact: data.get('expected_impact') || '',
     next_action: data.get('next_action') || '',
-    tags: data.get('tags') || '',
+    tags: data.getAll('tags'),
     payload: {
       raw: Object.fromEntries(data.entries())
     }
@@ -170,7 +170,7 @@ function hasMeaningfulInput(idea) {
     idea.description ||
     idea.expected_impact ||
     idea.next_action ||
-    idea.tags
+    selectedTags(idea).length
   );
 }
 
@@ -196,7 +196,7 @@ function loadIdeaIntoForm(idea) {
   form.elements.description.value = idea.description || '';
   form.elements.expected_impact.value = idea.expected_impact || '';
   form.elements.next_action.value = idea.next_action || '';
-  form.elements.tags.value = Array.isArray(idea.tags) ? idea.tags.join(', ') : idea.tags || '';
+  setSelectedTags(selectedTags(idea));
   state.lastSavedSignature = JSON.stringify(collectIdea());
   updateSnapshot(idea);
   setSaveState('saved', '불러옴');
@@ -257,6 +257,7 @@ function renderTable() {
       <td data-label="제목">
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
         <small>${escapeHtml(summaryText(idea.description))}</small>
+        ${renderTags(idea.tags)}
       </td>
       <td data-label="매장">${escapeHtml(idea.store || '')}</td>
       <td data-label="담당자">${escapeHtml(idea.owner || '')}</td>
@@ -295,6 +296,24 @@ function statusName(value) {
 
 function priorityName(value) {
   return labels.priority[value] || value || '';
+}
+
+function selectedTags(idea) {
+  if (Array.isArray(idea.tags)) return idea.tags;
+  return String(idea.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean);
+}
+
+function setSelectedTags(tags) {
+  const selected = new Set(tags);
+  for (const input of form.querySelectorAll('input[name="tags"]')) {
+    input.checked = selected.has(input.value);
+  }
+}
+
+function renderTags(tags) {
+  const values = selectedTags({ tags });
+  if (!values.length) return '';
+  return `<span class="tag-line">${values.map((tag) => `<em>${escapeHtml(tag)}</em>`).join('')}</span>`;
 }
 
 function normalizeStatus(value) {
