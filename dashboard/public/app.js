@@ -11,6 +11,7 @@ const clearFiltersButton = document.querySelector('#clearFiltersButton');
 const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
 const allScopeCount = document.querySelector('#allScopeCount');
+const boardTitle = document.querySelector('#boardTitle');
 const activeScopePath = document.querySelector('#activeScopePath');
 const formScopeNote = document.querySelector('#formScopeNote');
 const categoryMajorSelect = document.querySelector('#categoryMajorSelect');
@@ -614,7 +615,9 @@ function applyScopeDefaultsToForm() {
 
 function renderScopeHeader() {
   const label = scopeLabel(state.selectedScope);
-  activeScopePath.textContent = label;
+  const heading = scopeHeading(state.selectedScope);
+  if (boardTitle) boardTitle.textContent = heading.title;
+  activeScopePath.textContent = heading.context;
   formScopeNote.textContent = label;
   if (allScopeButton) {
     allScopeButton.classList.toggle('active', state.selectedScope.kind === 'all');
@@ -763,6 +766,32 @@ function scopeActive(scope) {
     current.major === target.major &&
     current.subcategory === target.subcategory &&
     current.store === target.store;
+}
+
+function scopeHeading(scope) {
+  const normalized = normalizeScope(scope);
+  if (normalized.kind === 'store') {
+    return {
+      title: `${normalized.store} 보드`,
+      context: [normalized.major, normalized.subcategory].filter(Boolean).join(' / ')
+    };
+  }
+  if (normalized.kind === 'subcategory') {
+    return {
+      title: `${normalized.subcategory} 보드`,
+      context: normalized.major
+    };
+  }
+  if (normalized.kind === 'major') {
+    return {
+      title: `${normalized.major} 보드`,
+      context: '대카테고리'
+    };
+  }
+  return {
+    title: '기획안 보드',
+    context: '전체 업무'
+  };
 }
 
 function scopeLabel(scope) {

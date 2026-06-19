@@ -56,7 +56,9 @@ button:hover {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
+  width: min(100%, 1440px);
+  margin-inline: auto;
   min-height: 100vh;
 }
 
@@ -64,7 +66,7 @@ button:hover {
   border-right: 1px solid var(--line);
   background: #fff;
   color: var(--text);
-  padding: 34px 22px;
+  padding: 32px 20px;
 }
 
 .brand {
@@ -273,14 +275,12 @@ button:hover {
 }
 
 .active-scope-title {
-  margin-top: 10px;
+  margin-top: 7px;
   max-width: 760px;
-  border-top: 1px solid var(--line-strong);
-  padding-top: 10px;
-  color: var(--text);
-  font-size: 20px;
+  color: var(--muted);
+  font-size: 13px;
   font-weight: 800;
-  line-height: 1.35;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
@@ -999,6 +999,8 @@ td small {
   }
 
   .sidebar {
+    display: flex;
+    justify-content: center;
     border-right: 0;
     border-bottom: 1px solid var(--line);
     width: min(100%, 720px);
@@ -1007,7 +1009,11 @@ td small {
   }
 
   .scope-panel {
-    margin-top: 18px;
+    display: none;
+  }
+
+  .brand {
+    width: min(100%, 720px);
   }
 
   .input-layout,
