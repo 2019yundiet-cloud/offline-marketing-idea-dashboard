@@ -5,6 +5,9 @@ const storageMode = document.querySelector('#storageMode');
 const ideasBody = document.querySelector('#ideasBody');
 const recordCount = document.querySelector('#recordCount');
 const stageTabs = document.querySelector('#stageTabs');
+const quickFilters = document.querySelector('#quickFilters');
+const projectSearch = document.querySelector('#projectSearch');
+const clearFiltersButton = document.querySelector('#clearFiltersButton');
 const categoryForm = document.querySelector('#categoryForm');
 const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
@@ -56,8 +59,10 @@ const CATEGORY_STORAGE_KEY = 'offline-marketing-categories:v1';
 const MAX_PHOTOS = 4;
 const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
+const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const STORES = ['머문래', '갤러리문래'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
+const GLOBAL_TAGS = ['메뉴', '인테리어', '온라인마케팅', '오프라인 마케팅'];
 const DEFAULT_CATEGORIES = [
   { id: 'cat_menu', level: 'major', parent_id: '', name: '메뉴', sort_order: 10 },
   { id: 'cat_menu_new', level: 'sub', parent_id: 'cat_menu', name: '신메뉴 기획', sort_order: 11 },
@@ -77,6 +82,7 @@ const state = {
   ideas: [],
   selectedScope: { kind: 'all', major: '', subcategory: '', store: '' },
   selectedStage: 'all',
+  filters: { owner: 'all', store: 'all', workType: 'all', tag: 'all', query: '' },
   saveTimer: null,
   pendingRequest: Promise.resolve(),
   lastSavedSignature: ''
@@ -104,6 +110,12 @@ function bindAutosave() {
   });
   photoInput.addEventListener('change', handlePhotoSelect);
   photoPreview.addEventListener('click', handlePhotoPreviewClick);
+  quickFilters.addEventListener('click', handleQuickFilterClick);
+  projectSearch.addEventListener('input', () => {
+    state.filters.query = projectSearch.value.trim();
+    render();
+  });
+  clearFiltersButton.addEventListener('click', clearQuickFilters);
   categoryForm.addEventListener('submit', handleCategorySubmit);
   categoryTree.addEventListener('click', handleScopeClick);
   allScopeButton.addEventListener('click', () => setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' }));
@@ -363,6 +375,7 @@ function upsertIdea(idea) {
 function render() {
   renderScopeHeader();
   updateScopeControlledFields();
+  renderQuickFilters();
   renderCategoryTree();
   renderMetrics();
   renderStageTabs();
@@ -401,7 +414,7 @@ function renderTable() {
   const visibleIdeas = state.selectedStage === 'all'
     ? scoped
     : scoped.filter((idea) => normalizeStatus(idea.status) === state.selectedStage);
-  recordCount.textContent = `${visibleIdeas.length}개 · ${scopeLabel(state.selectedScope)}`;
+  recordCount.textContent = `${visibleIdeas.length}개 · ${viewLabel()}`;
   if (!visibleIdeas.length) {
     ideasBody.innerHTML = '<tr class="empty-row"><td colspan="9">기획안 없음</td></tr>';
     return;
@@ -476,6 +489,68 @@ function renderTags(tags) {
   return `<span class="tag-line">${values.map((tag) => `<em>${escapeHtml(tag)}</em>`).join('')}</span>`;
 }
 
+function handleQuickFilterClick(event) {
+  const button = event.target.closest('button[data-filter-key]');
+  if (!button) return;
+  state.filters[button.dataset.filterKey] = button.dataset.filterValue;
+  render();
+}
+
+function clearQuickFilters() {
+  state.filters = { owner: 'all', store: 'all', workType: 'all', tag: 'all', query: '' };
+  projectSearch.value = '';
+  render();
+}
+
+function renderQuickFilters() {
+  renderFilterLane('owner', USERS);
+  renderFilterLane('store', STORES);
+  renderFilterLane('workType', WORK_TYPES);
+  renderFilterLane('tag', GLOBAL_TAGS);
+  clearFiltersButton.disabled = !hasActiveQuickFilters();
+}
+
+function renderFilterLane(key, values) {
+  const container = quickFilters.querySelector(`[data-filter-options="${key}"]`);
+  const options = ['all', ...values];
+  container.innerHTML = options.map((value) => {
+    const label = value === 'all' ? '전체' : value;
+    const active = state.filters[key] === value;
+    return `
+      <button type="button" class="${active ? 'active' : ''}"
+        data-filter-key="${escapeHtml(key)}"
+        data-filter-value="${escapeHtml(value)}">
+        <span>${escapeHtml(label)}</span>
+        <strong>${countForFilter(key, value).toLocaleString('ko-KR')}</strong>
+      </button>
+    `;
+  }).join('');
+}
+
+function countForFilter(key, value) {
+  const filters = { ...state.filters, [key]: value };
+  return state.ideas.filter((idea) => matchesScope(idea, state.selectedScope) && matchesQuickFilters(idea, filters)).length;
+}
+
+function hasActiveQuickFilters() {
+  return state.filters.owner !== 'all' ||
+    state.filters.store !== 'all' ||
+    state.filters.workType !== 'all' ||
+    state.filters.tag !== 'all' ||
+    Boolean(state.filters.query);
+}
+
+function viewLabel() {
+  const filters = [
+    state.filters.owner !== 'all' ? state.filters.owner : '',
+    state.filters.store !== 'all' ? state.filters.store : '',
+    state.filters.workType !== 'all' ? state.filters.workType : '',
+    state.filters.tag !== 'all' ? `#${state.filters.tag}` : '',
+    state.filters.query ? `"${state.filters.query}"` : ''
+  ].filter(Boolean);
+  return [scopeLabel(state.selectedScope), ...filters].join(' · ');
+}
+
 function handleScopeClick(event) {
   const button = event.target.closest('button[data-scope-kind]');
   if (!button) return;
@@ -504,7 +579,7 @@ function renderScopeHeader() {
   activeScopePath.textContent = label;
   formScopeNote.textContent = label;
   allScopeButton.classList.toggle('active', state.selectedScope.kind === 'all');
-  allScopeCount.textContent = state.ideas.length.toLocaleString('ko-KR');
+  allScopeCount.textContent = state.ideas.filter((idea) => matchesQuickFilters(idea, state.filters)).length.toLocaleString('ko-KR');
 }
 
 function updateScopeControlledFields() {
@@ -586,11 +661,11 @@ function renderSubcategoryOptions(majorName, selectedSubcategory = form.elements
 }
 
 function scopedIdeas() {
-  return state.ideas.filter((idea) => matchesScope(idea, state.selectedScope));
+  return state.ideas.filter((idea) => matchesScope(idea, state.selectedScope) && matchesQuickFilters(idea, state.filters));
 }
 
 function countIdeas(scope) {
-  return state.ideas.filter((idea) => matchesScope(idea, scope)).length;
+  return state.ideas.filter((idea) => matchesScope(idea, scope) && matchesQuickFilters(idea, state.filters)).length;
 }
 
 function matchesScope(idea, scope) {
@@ -600,6 +675,26 @@ function matchesScope(idea, scope) {
   if (normalized.subcategory && idea.category_sub !== normalized.subcategory) return false;
   if (normalized.store && idea.store !== normalized.store) return false;
   return true;
+}
+
+function matchesQuickFilters(idea, filters) {
+  if (filters.owner !== 'all' && idea.owner !== filters.owner) return false;
+  if (filters.store !== 'all' && idea.store !== filters.store) return false;
+  if (filters.workType !== 'all' && normalizeWorkType(idea.work_type) !== filters.workType) return false;
+  if (filters.tag !== 'all' && !selectedTags(idea).includes(filters.tag)) return false;
+  if (filters.query && !matchesQuery(idea, filters.query)) return false;
+  return true;
+}
+
+function matchesQuery(idea, query) {
+  const needle = query.toLowerCase();
+  return [
+    idea.project_name,
+    idea.title,
+    idea.description,
+    idea.expected_impact,
+    idea.next_action
+  ].some((value) => String(value || '').toLowerCase().includes(needle));
 }
 
 function normalizeScope(scope) {

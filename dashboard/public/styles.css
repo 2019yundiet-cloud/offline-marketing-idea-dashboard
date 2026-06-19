@@ -352,6 +352,105 @@ button:hover {
   font-weight: 700;
 }
 
+.quick-filters {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  padding: 18px;
+  background: #fff;
+}
+
+.quick-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-filter-header h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.quick-filter-header button {
+  min-height: 44px;
+  border-color: var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quick-filter-header button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.quick-filter-header button:disabled:hover {
+  background: #fff;
+  color: var(--muted);
+}
+
+.quick-search {
+  display: grid;
+  gap: 7px;
+}
+
+.quick-search span,
+.filter-lane > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quick-search input {
+  border-radius: 8px;
+}
+
+.filter-lanes {
+  display: grid;
+  gap: 12px;
+}
+
+.filter-lane {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filter-pills button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  border-color: var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.filter-pills button.active {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.filter-pills strong {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  opacity: 0.72;
+}
+
 .metric,
 .entry-form,
 .side-panel,
@@ -457,6 +556,10 @@ label span,
   padding: 0;
 }
 
+.tag-field {
+  grid-column: 1 / -1;
+}
+
 .attachment-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
@@ -549,7 +652,7 @@ label span,
 
 .tag-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -911,6 +1014,10 @@ td small {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .tag-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .attachment-grid {
     grid-template-columns: 1fr;
   }
@@ -990,6 +1097,36 @@ td small {
 
   .stage-tabs button:last-child {
     border-right: 1px solid var(--line);
+  }
+
+  .quick-filters {
+    gap: 12px;
+    margin: 0 -16px;
+    padding: 14px 16px;
+    border-right: 0;
+    border-left: 0;
+  }
+
+  .quick-filter-header {
+    align-items: center;
+  }
+
+  .filter-lanes {
+    gap: 14px;
+  }
+
+  .filter-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 0 16px 2px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .filter-pills button {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
   }
 
   .topbar,

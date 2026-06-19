@@ -105,6 +105,35 @@
           </button>
         </section>
 
+        <section class="quick-filters" id="quickFilters" aria-label="빠른 보기">
+          <div class="quick-filter-header">
+            <h3>빠른 보기</h3>
+            <button type="button" id="clearFiltersButton">초기화</button>
+          </div>
+          <label class="quick-search">
+            <span>프로젝트 검색</span>
+            <input id="projectSearch" type="search" placeholder="프로젝트명, 제목, 내용">
+          </label>
+          <div class="filter-lanes">
+            <div class="filter-lane" data-filter-key="owner">
+              <span>팀원</span>
+              <div class="filter-pills" data-filter-options="owner"></div>
+            </div>
+            <div class="filter-lane" data-filter-key="store">
+              <span>매장</span>
+              <div class="filter-pills" data-filter-options="store"></div>
+            </div>
+            <div class="filter-lane" data-filter-key="workType">
+              <span>구분</span>
+              <div class="filter-pills" data-filter-options="workType"></div>
+            </div>
+            <div class="filter-lane" data-filter-key="tag">
+              <span>전역 태그</span>
+              <div class="filter-pills" data-filter-options="tag"></div>
+            </div>
+          </div>
+        </section>
+
         <section id="input" class="input-layout">
           <form id="ideaForm" class="entry-form" autocomplete="off">
             <div class="form-header">
@@ -196,7 +225,7 @@
                 </select>
               </label>
               <fieldset class="tag-field">
-                <legend>태그</legend>
+                <legend>전역 태그</legend>
                 <div class="tag-options" aria-label="태그 선택">
                   <label>
                     <input name="tags" type="checkbox" value="메뉴">
