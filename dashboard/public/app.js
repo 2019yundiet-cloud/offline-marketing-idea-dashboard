@@ -8,7 +8,6 @@ const stageTabs = document.querySelector('#stageTabs');
 const quickFilters = document.querySelector('#quickFilters');
 const projectSearch = document.querySelector('#projectSearch');
 const clearFiltersButton = document.querySelector('#clearFiltersButton');
-const categoryForm = document.querySelector('#categoryForm');
 const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
 const allScopeCount = document.querySelector('#allScopeCount');
@@ -116,7 +115,6 @@ function bindAutosave() {
     render();
   });
   clearFiltersButton.addEventListener('click', clearQuickFilters);
-  categoryForm.addEventListener('submit', handleCategorySubmit);
   categoryTree.addEventListener('click', handleScopeClick);
   allScopeButton.addEventListener('click', () => setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' }));
   categoryMajorSelect.addEventListener('change', () => {
@@ -171,64 +169,6 @@ async function loadCategories() {
     state.categories = mergeCategories(readBrowserCategories());
   }
   saveBrowserCategories(state.categories);
-}
-
-async function handleCategorySubmit(event) {
-  event.preventDefault();
-  const data = new FormData(categoryForm);
-  const majorName = String(data.get('major') || '').trim();
-  const subcategoryName = String(data.get('subcategory') || '').trim();
-  if (!majorName && !subcategoryName) return;
-
-  const major = await ensureCategory(majorName || '기타', '', 'major');
-  let subcategory = null;
-  if (subcategoryName) {
-    subcategory = await ensureCategory(subcategoryName, major.id, 'sub');
-  }
-
-  categoryForm.reset();
-  renderCategorySelects();
-  setSelectedScope(subcategory
-    ? { kind: 'subcategory', major: major.name, subcategory: subcategory.name, store: '' }
-    : { kind: 'major', major: major.name, subcategory: '', store: '' });
-  setSaveState('saved', '카테고리 저장됨');
-}
-
-async function ensureCategory(name, parentId, level) {
-  const normalizedName = String(name || '').trim();
-  const normalizedParentId = String(parentId || '');
-  const existing = state.categories.find((category) => (
-    category.level === level &&
-    category.parent_id === normalizedParentId &&
-    category.name === normalizedName
-  ));
-  if (existing) return existing;
-
-  const category = {
-    id: createCategoryId(level, normalizedName, normalizedParentId),
-    level,
-    parent_id: normalizedParentId,
-    name: normalizedName,
-    sort_order: state.categories.length + 100,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-
-  try {
-    const response = await fetch(API_CATEGORIES_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(category)
-    });
-    if (!response.ok) throw new Error('category_save_failed');
-    const payload = await response.json();
-    upsertCategory(payload.category || category);
-  } catch {
-    upsertCategory(category);
-    saveBrowserCategories(state.categories);
-  }
-
-  return state.categories.find((item) => item.id === category.id) || category;
 }
 
 function scheduleSave() {

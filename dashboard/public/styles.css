@@ -168,17 +168,6 @@ button:hover {
   padding: 0 8px;
 }
 
-.category-form {
-  display: grid;
-  gap: 10px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.category-form button {
-  width: 100%;
-}
-
 .category-tree {
   display: grid;
   gap: 6px;
@@ -1021,14 +1010,6 @@ td small {
     margin-top: 18px;
   }
 
-  .category-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .category-form button {
-    grid-column: 1 / -1;
-  }
-
   .input-layout,
   .metric-grid {
     grid-template-columns: 1fr;
@@ -1069,10 +1050,6 @@ td small {
 
   .sidebar {
     padding: calc(16px + env(safe-area-inset-top)) 16px 18px;
-  }
-
-  .category-form {
-    grid-template-columns: 1fr;
   }
 
   .topbar {
