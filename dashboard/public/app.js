@@ -56,6 +56,7 @@ const API_IDEAS_URL = 'api/ideas';
 const API_CATEGORIES_URL = 'api/categories';
 const LOCAL_STORAGE_KEY = 'offline-marketing-ideas:v1';
 const CATEGORY_STORAGE_KEY = 'offline-marketing-categories:v1';
+const CATEGORY_COLLAPSE_STORAGE_KEY = 'offline-marketing-category-collapse:v1';
 const MAX_PHOTOS = 4;
 const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
@@ -81,6 +82,7 @@ const state = {
   categories: [],
   ideas: [],
   selectedScope: { kind: 'all', major: '', subcategory: '', store: '' },
+  collapsedMajors: readCollapsedMajors(),
   selectedStage: 'all',
   filters: { owner: 'all', store: 'all', workType: 'all', tag: 'all', query: '' },
   saveTimer: null,
@@ -552,6 +554,12 @@ function viewLabel() {
 }
 
 function handleScopeClick(event) {
+  const toggle = event.target.closest('button[data-category-toggle]');
+  if (toggle) {
+    toggleMajorCategory(toggle.dataset.categoryToggle);
+    return;
+  }
+
   const button = event.target.closest('button[data-scope-kind]');
   if (!button) return;
   setSelectedScope({
@@ -564,8 +572,27 @@ function handleScopeClick(event) {
 
 function setSelectedScope(scope) {
   state.selectedScope = normalizeScope(scope);
+  expandSelectedMajor();
   if (!state.lastSavedSignature) applyScopeDefaultsToForm();
   render();
+}
+
+function toggleMajorCategory(categoryId) {
+  if (!categoryId) return;
+  if (state.collapsedMajors.has(categoryId)) {
+    state.collapsedMajors.delete(categoryId);
+  } else {
+    state.collapsedMajors.add(categoryId);
+  }
+  saveCollapsedMajors(state.collapsedMajors);
+  renderCategoryTree();
+}
+
+function expandSelectedMajor() {
+  const selectedMajor = majorCategories().find((category) => category.name === state.selectedScope.major);
+  if (!selectedMajor || !state.collapsedMajors.has(selectedMajor.id)) return;
+  state.collapsedMajors.delete(selectedMajor.id);
+  saveCollapsedMajors(state.collapsedMajors);
 }
 
 function applyScopeDefaultsToForm() {
@@ -594,6 +621,8 @@ function renderCategoryTree() {
   categoryTree.innerHTML = majors.map((major) => {
     const majorScope = { kind: 'major', major: major.name, subcategory: '', store: '' };
     const subs = subCategories(major.id);
+    const hasChildren = subs.length > 0;
+    const collapsed = hasChildren && state.collapsedMajors.has(major.id);
     const children = subs.map((subcategory) => {
       const subScope = { kind: 'subcategory', major: major.name, subcategory: subcategory.name, store: '' };
       const stores = STORES.map((store) => {
@@ -626,13 +655,22 @@ function renderCategoryTree() {
 
     return `
       <section class="category-group">
-        <button type="button" class="category-major ${scopeActive(majorScope) ? 'active' : ''}"
-          data-scope-kind="major"
-          data-major="${escapeHtml(major.name)}">
-          <span>${escapeHtml(major.name)}</span>
-          <strong>${countIdeas(majorScope).toLocaleString('ko-KR')}</strong>
-        </button>
-        <div class="subcategory-list">${children}</div>
+        <div class="category-major-row ${scopeActive(majorScope) ? 'active' : ''}">
+          <button type="button" class="category-major"
+            data-scope-kind="major"
+            data-major="${escapeHtml(major.name)}">
+            <span>${escapeHtml(major.name)}</span>
+            <strong>${countIdeas(majorScope).toLocaleString('ko-KR')}</strong>
+          </button>
+          <button type="button" class="category-toggle"
+            data-category-toggle="${escapeHtml(major.id)}"
+            aria-label="${escapeHtml(`${major.name} ${collapsed ? '펼치기' : '접기'}`)}"
+            aria-expanded="${String(!collapsed)}"
+            ${hasChildren ? '' : 'disabled'}>
+            <span aria-hidden="true">${collapsed ? '+' : '-'}</span>
+          </button>
+        </div>
+        ${hasChildren ? `<div class="subcategory-list" ${collapsed ? 'hidden' : ''}>${children}</div>` : ''}
       </section>
     `;
   }).join('');
@@ -829,6 +867,24 @@ function readBrowserCategories() {
 
 function saveBrowserCategories(categories) {
   localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(mergeCategories(categories)));
+}
+
+function readCollapsedMajors() {
+  try {
+    const raw = localStorage.getItem(CATEGORY_COLLAPSE_STORAGE_KEY);
+    const values = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(values) ? values.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCollapsedMajors(collapsedMajors) {
+  try {
+    localStorage.setItem(CATEGORY_COLLAPSE_STORAGE_KEY, JSON.stringify([...collapsedMajors]));
+  } catch {
+    // The dashboard still works if browser storage is unavailable.
+  }
 }
 
 async function handlePhotoSelect() {
