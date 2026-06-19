@@ -63,7 +63,6 @@ const PHOTO_TARGET_BYTES = 420 * 1024;
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const STORES = ['머문래', '갤러리문래'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
-const GLOBAL_TAGS = ['메뉴', '인테리어', '온라인마케팅', '오프라인 마케팅'];
 const DEFAULT_CATEGORIES = [
   { id: 'cat_interior', level: 'major', parent_id: '', name: '인테리어', sort_order: 10 },
   { id: 'cat_interior_store', level: 'sub', parent_id: 'cat_interior', name: '매장 환경', sort_order: 11 },
@@ -83,7 +82,7 @@ const state = {
   selectedScope: { kind: 'all', major: '', subcategory: '', store: '' },
   collapsedMajors: readCollapsedMajors(),
   selectedStage: 'all',
-  filters: { owner: 'all', store: 'all', workType: 'all', tag: 'all', query: '' },
+  filters: { owner: 'all', store: 'all', workType: 'all', query: '' },
   saveTimer: null,
   pendingRequest: Promise.resolve(),
   lastSavedSignature: ''
@@ -426,7 +425,6 @@ function renderTable() {
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
         ${renderWorkMeta(idea)}
         <small>${escapeHtml(summaryText(idea.description))}</small>
-        ${renderTags(idea.tags)}
         ${renderLinks(idea.links)}
       </td>
       <td data-label="카테고리">${renderCategoryCell(idea)}</td>
@@ -442,6 +440,7 @@ function renderTable() {
 }
 
 function updateSnapshot(idea) {
+  if (!snapshotId) return;
   snapshotId.textContent = idea?.client_id || state.currentClientId || '-';
   snapshotUpdated.textContent = idea?.updated_at ? new Date(idea.updated_at).toLocaleString('ko-KR') : '-';
   snapshotStorage.textContent = idea?.remote_status === 'synced'
@@ -491,6 +490,17 @@ function renderTags(tags) {
 }
 
 function handleQuickFilterClick(event) {
+  const scopeButton = event.target.closest('button[data-scope-kind]');
+  if (scopeButton) {
+    setSelectedScope({
+      kind: scopeButton.dataset.scopeKind,
+      major: scopeButton.dataset.major || '',
+      subcategory: scopeButton.dataset.subcategory || '',
+      store: scopeButton.dataset.store || ''
+    });
+    return;
+  }
+
   const button = event.target.closest('button[data-filter-key]');
   if (!button) return;
   state.filters[button.dataset.filterKey] = button.dataset.filterValue;
@@ -498,17 +508,71 @@ function handleQuickFilterClick(event) {
 }
 
 function clearQuickFilters() {
-  state.filters = { owner: 'all', store: 'all', workType: 'all', tag: 'all', query: '' };
+  state.filters = { owner: 'all', store: 'all', workType: 'all', query: '' };
   projectSearch.value = '';
-  render();
+  setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' });
 }
 
 function renderQuickFilters() {
+  renderScopeFilterLane('major');
+  renderScopeFilterLane('subcategory');
   renderFilterLane('owner', USERS);
   renderFilterLane('store', STORES);
   renderFilterLane('workType', WORK_TYPES);
-  renderFilterLane('tag', GLOBAL_TAGS);
   clearFiltersButton.disabled = !hasActiveQuickFilters();
+}
+
+function renderScopeFilterLane(kind) {
+  const container = quickFilters.querySelector(`[data-scope-options="${kind}"]`);
+  if (!container) return;
+
+  const current = normalizeScope(state.selectedScope);
+  const options = kind === 'major'
+    ? [
+      { label: '전체', scope: { kind: 'all', major: '', subcategory: '', store: '' } },
+      ...majorCategories().map((major) => ({
+        label: major.name,
+        scope: { kind: 'major', major: major.name, subcategory: '', store: '' }
+      }))
+    ]
+    : subcategoryScopeOptions(current);
+
+  container.innerHTML = options.map((option) => {
+    const scope = normalizeScope(option.scope);
+    const active = scopeActive(scope);
+    return `
+      <button type="button" class="${active ? 'active' : ''}"
+        data-scope-kind="${escapeHtml(scope.kind)}"
+        data-major="${escapeHtml(scope.major)}"
+        data-subcategory="${escapeHtml(scope.subcategory)}"
+        data-store="${escapeHtml(scope.store)}">
+        <span>${escapeHtml(option.label)}</span>
+        <strong>${countIdeas(scope).toLocaleString('ko-KR')}</strong>
+      </button>
+    `;
+  }).join('');
+}
+
+function subcategoryScopeOptions(current) {
+  const selectedMajor = current.major
+    ? majorCategories().find((major) => major.name === current.major)
+    : null;
+  const baseScope = selectedMajor
+    ? { kind: 'major', major: selectedMajor.name, subcategory: '', store: '' }
+    : { kind: 'all', major: '', subcategory: '', store: '' };
+  const majors = selectedMajor ? [selectedMajor] : majorCategories();
+  const options = [{ label: '전체', scope: baseScope }];
+
+  for (const major of majors) {
+    for (const subcategory of subCategories(major.id)) {
+      options.push({
+        label: selectedMajor ? subcategory.name : `${major.name} / ${subcategory.name}`,
+        scope: { kind: 'subcategory', major: major.name, subcategory: subcategory.name, store: '' }
+      });
+    }
+  }
+
+  return options;
 }
 
 function renderFilterLane(key, values) {
@@ -534,10 +598,10 @@ function countForFilter(key, value) {
 }
 
 function hasActiveQuickFilters() {
-  return state.filters.owner !== 'all' ||
+  return state.selectedScope.kind !== 'all' ||
+    state.filters.owner !== 'all' ||
     state.filters.store !== 'all' ||
     state.filters.workType !== 'all' ||
-    state.filters.tag !== 'all' ||
     Boolean(state.filters.query);
 }
 
@@ -546,7 +610,6 @@ function viewLabel() {
     state.filters.owner !== 'all' ? state.filters.owner : '',
     state.filters.store !== 'all' ? state.filters.store : '',
     state.filters.workType !== 'all' ? state.filters.workType : '',
-    state.filters.tag !== 'all' ? `#${state.filters.tag}` : '',
     state.filters.query ? `"${state.filters.query}"` : ''
   ].filter(Boolean);
   return [scopeLabel(state.selectedScope), ...filters].join(' · ');
@@ -722,7 +785,6 @@ function matchesQuickFilters(idea, filters) {
   if (filters.owner !== 'all' && idea.owner !== filters.owner) return false;
   if (filters.store !== 'all' && idea.store !== filters.store) return false;
   if (filters.workType !== 'all' && normalizeWorkType(idea.work_type) !== filters.workType) return false;
-  if (filters.tag !== 'all' && !selectedTags(idea).includes(filters.tag)) return false;
   if (filters.query && !matchesQuery(idea, filters.query)) return false;
   return true;
 }

@@ -102,7 +102,10 @@
 
         <section class="quick-filters" id="quickFilters" aria-label="빠른 보기">
           <div class="quick-filter-header">
-            <h3>빠른 보기</h3>
+            <div>
+              <p class="section-mode">읽기</p>
+              <h3>빠른 보기</h3>
+            </div>
             <button type="button" id="clearFiltersButton">초기화</button>
           </div>
           <label class="quick-search">
@@ -110,6 +113,14 @@
             <input id="projectSearch" type="search" placeholder="프로젝트명, 제목, 내용">
           </label>
           <div class="filter-lanes">
+            <div class="filter-lane">
+              <span>대카테고리</span>
+              <div class="filter-pills" data-scope-options="major"></div>
+            </div>
+            <div class="filter-lane">
+              <span>소카테고리</span>
+              <div class="filter-pills" data-scope-options="subcategory"></div>
+            </div>
             <div class="filter-lane" data-filter-key="owner">
               <span>팀원</span>
               <div class="filter-pills" data-filter-options="owner"></div>
@@ -122,10 +133,31 @@
               <span>구분</span>
               <div class="filter-pills" data-filter-options="workType"></div>
             </div>
-            <div class="filter-lane" data-filter-key="tag">
-              <span>전역 태그</span>
-              <div class="filter-pills" data-filter-options="tag"></div>
-            </div>
+          </div>
+        </section>
+
+        <section id="records" class="records-section">
+          <div class="section-heading">
+            <h3>기획안 목록</h3>
+            <span id="recordCount">0개</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>제목</th>
+                  <th>카테고리</th>
+                  <th>매장</th>
+                  <th>담당자</th>
+                  <th>상태</th>
+                  <th>우선순위</th>
+                  <th>유형</th>
+                  <th>첨부</th>
+                  <th>수정일</th>
+                </tr>
+              </thead>
+              <tbody id="ideasBody"></tbody>
+            </table>
           </div>
         </section>
 
@@ -133,7 +165,8 @@
           <form id="ideaForm" class="entry-form" autocomplete="off">
             <div class="form-header">
               <div>
-                <h3>기획안 입력</h3>
+                <p class="section-mode">쓰기</p>
+                <h3>기획안 작성</h3>
                 <p id="formScopeNote" class="form-scope-note">전체 업무</p>
               </div>
               <button type="button" id="newIdeaButton">새 기획안</button>
@@ -219,27 +252,6 @@
                   <option value="고객경험">고객경험</option>
                 </select>
               </label>
-              <fieldset class="tag-field">
-                <legend>전역 태그</legend>
-                <div class="tag-options" aria-label="태그 선택">
-                  <label>
-                    <input name="tags" type="checkbox" value="메뉴">
-                    <span>메뉴</span>
-                  </label>
-                  <label>
-                    <input name="tags" type="checkbox" value="인테리어">
-                    <span>인테리어</span>
-                  </label>
-                  <label>
-                    <input name="tags" type="checkbox" value="온라인마케팅">
-                    <span>온라인마케팅</span>
-                  </label>
-                  <label>
-                    <input name="tags" type="checkbox" value="오프라인 마케팅">
-                    <span>오프라인 마케팅</span>
-                  </label>
-                </div>
-              </fieldset>
               <label class="wide">
                 <span>아이디어 내용</span>
                 <textarea name="description" rows="6" placeholder="아이디어의 배경, 장면, 고객 반응 가설"></textarea>
@@ -270,44 +282,6 @@
               </fieldset>
             </div>
           </form>
-
-          <section class="side-panel" aria-label="현재 아이디어">
-            <h3>현재 저장값</h3>
-            <dl class="snapshot">
-              <div><dt>저장 ID</dt><dd id="snapshotId">-</dd></div>
-              <div><dt>마지막 저장</dt><dd id="snapshotUpdated">-</dd></div>
-              <div><dt>저장 위치</dt><dd id="snapshotStorage">-</dd></div>
-              <div><dt>카테고리</dt><dd id="snapshotScope">-</dd></div>
-              <div><dt>프로젝트</dt><dd id="snapshotProject">-</dd></div>
-              <div><dt>운영 매장</dt><dd>머문래 · 갤러리문래</dd></div>
-              <div><dt>사용자</dt><dd>준호 · 동원 · 보미 · 상준 · 유민</dd></div>
-            </dl>
-          </section>
-        </section>
-
-        <section id="records" class="records-section">
-          <div class="section-heading">
-            <h3>아이디어 목록</h3>
-            <span id="recordCount">0개</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>제목</th>
-                  <th>카테고리</th>
-                  <th>매장</th>
-                  <th>담당자</th>
-                  <th>상태</th>
-                  <th>우선순위</th>
-                  <th>유형</th>
-                  <th>첨부</th>
-                  <th>수정일</th>
-                </tr>
-              </thead>
-              <tbody id="ideasBody"></tbody>
-            </table>
-          </div>
         </section>
       </main>
     </div>
