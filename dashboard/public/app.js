@@ -553,25 +553,33 @@ function viewLabel() {
 }
 
 function handleScopeClick(event) {
-  const toggle = event.target.closest('button[data-category-toggle]');
-  if (toggle) {
-    toggleMajorCategory(toggle.dataset.categoryToggle);
-    return;
-  }
-
   const button = event.target.closest('button[data-scope-kind]');
   if (!button) return;
-  setSelectedScope({
+  const scope = {
     kind: button.dataset.scopeKind,
     major: button.dataset.major || '',
     subcategory: button.dataset.subcategory || '',
     store: button.dataset.store || ''
-  });
+  };
+
+  if (scope.kind === 'major') {
+    setSelectedMajorScope(scope, button.dataset.categoryId || '');
+    return;
+  }
+
+  setSelectedScope(scope);
 }
 
 function setSelectedScope(scope) {
   state.selectedScope = normalizeScope(scope);
   expandSelectedMajor();
+  if (!state.lastSavedSignature) applyScopeDefaultsToForm();
+  render();
+}
+
+function setSelectedMajorScope(scope, categoryId) {
+  state.selectedScope = normalizeScope(scope);
+  toggleMajorCategory(categoryId);
   if (!state.lastSavedSignature) applyScopeDefaultsToForm();
   render();
 }
@@ -584,7 +592,6 @@ function toggleMajorCategory(categoryId) {
     state.collapsedMajors.add(categoryId);
   }
   saveCollapsedMajors(state.collapsedMajors);
-  renderCategoryTree();
 }
 
 function expandSelectedMajor() {
@@ -622,6 +629,7 @@ function renderCategoryTree() {
     const subs = subCategories(major.id);
     const hasChildren = subs.length > 0;
     const collapsed = hasChildren && state.collapsedMajors.has(major.id);
+    const panelId = `category-panel-${major.id}`;
     const children = subs.map((subcategory) => {
       const subScope = { kind: 'subcategory', major: major.name, subcategory: subcategory.name, store: '' };
       const stores = STORES.map((store) => {
@@ -654,22 +662,18 @@ function renderCategoryTree() {
 
     return `
       <section class="category-group">
-        <div class="category-major-row ${scopeActive(majorScope) ? 'active' : ''}">
-          <button type="button" class="category-major"
-            data-scope-kind="major"
-            data-major="${escapeHtml(major.name)}">
-            <span>${escapeHtml(major.name)}</span>
+        <button type="button" class="category-major ${scopeActive(majorScope) ? 'active' : ''}"
+          data-scope-kind="major"
+          data-category-id="${escapeHtml(major.id)}"
+          data-major="${escapeHtml(major.name)}"
+          ${hasChildren ? `aria-expanded="${String(!collapsed)}" aria-controls="${escapeHtml(panelId)}"` : ''}>
+          <span>${escapeHtml(major.name)}</span>
+          <span class="category-major-meta">
             <strong>${countIdeas(majorScope).toLocaleString('ko-KR')}</strong>
-          </button>
-          <button type="button" class="category-toggle"
-            data-category-toggle="${escapeHtml(major.id)}"
-            aria-label="${escapeHtml(`${major.name} ${collapsed ? '펼치기' : '접기'}`)}"
-            aria-expanded="${String(!collapsed)}"
-            ${hasChildren ? '' : 'disabled'}>
-            <span aria-hidden="true">${collapsed ? '+' : '-'}</span>
-          </button>
-        </div>
-        ${hasChildren ? `<div class="subcategory-list" ${collapsed ? 'hidden' : ''}>${children}</div>` : ''}
+            ${hasChildren ? `<span class="category-chevron" aria-hidden="true">${collapsed ? '›' : '⌄'}</span>` : ''}
+          </span>
+        </button>
+        ${hasChildren ? `<div id="${escapeHtml(panelId)}" class="subcategory-list" ${collapsed ? 'hidden' : ''}>${children}</div>` : ''}
       </section>
     `;
   }).join('');
