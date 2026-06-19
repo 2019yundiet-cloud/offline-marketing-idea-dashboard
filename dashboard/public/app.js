@@ -65,16 +65,15 @@ const STORES = ['머문래', '갤러리문래'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
 const GLOBAL_TAGS = ['메뉴', '인테리어', '온라인마케팅', '오프라인 마케팅'];
 const DEFAULT_CATEGORIES = [
-  { id: 'cat_menu', level: 'major', parent_id: '', name: '메뉴', sort_order: 10 },
-  { id: 'cat_menu_new', level: 'sub', parent_id: 'cat_menu', name: '신메뉴 기획', sort_order: 11 },
-  { id: 'cat_interior', level: 'major', parent_id: '', name: '인테리어', sort_order: 20 },
-  { id: 'cat_interior_store', level: 'sub', parent_id: 'cat_interior', name: '매장 환경', sort_order: 21 },
-  { id: 'cat_marketing', level: 'major', parent_id: '', name: '마케팅', sort_order: 30 },
-  { id: 'cat_marketing_online', level: 'sub', parent_id: 'cat_marketing', name: '온라인마케팅', sort_order: 31 },
-  { id: 'cat_marketing_offline', level: 'sub', parent_id: 'cat_marketing', name: '오프라인 마케팅', sort_order: 32 },
-  { id: 'cat_project', level: 'major', parent_id: '', name: '프로젝트', sort_order: 40 },
-  { id: 'cat_project_plan', level: 'sub', parent_id: 'cat_project', name: '기획안 관리', sort_order: 41 }
+  { id: 'cat_interior', level: 'major', parent_id: '', name: '인테리어', sort_order: 10 },
+  { id: 'cat_interior_store', level: 'sub', parent_id: 'cat_interior', name: '매장 환경', sort_order: 11 },
+  { id: 'cat_marketing', level: 'major', parent_id: '', name: '마케팅', sort_order: 20 },
+  { id: 'cat_marketing_online', level: 'sub', parent_id: 'cat_marketing', name: '온라인마케팅', sort_order: 21 },
+  { id: 'cat_marketing_offline', level: 'sub', parent_id: 'cat_marketing', name: '오프라인 마케팅', sort_order: 22 },
+  { id: 'cat_project', level: 'major', parent_id: '', name: '프로젝트', sort_order: 30 },
+  { id: 'cat_project_plan', level: 'sub', parent_id: 'cat_project', name: '기획안 관리', sort_order: 31 }
 ];
+const REMOVED_DEFAULT_CATEGORY_IDS = new Set(['cat_menu', 'cat_menu_new']);
 
 const state = {
   currentClientId: createClientId(),
@@ -811,6 +810,7 @@ function mergeCategories(categories) {
   }
   for (const category of categories || []) {
     const normalized = normalizeCategory(category);
+    if (isRemovedDefaultCategory(normalized)) continue;
     if (normalized) merged.set(normalized.id, normalized);
   }
   for (const idea of state.ideas) {
@@ -846,6 +846,13 @@ function normalizeCategory(category) {
     created_at: category?.created_at || '',
     updated_at: category?.updated_at || ''
   };
+}
+
+function isRemovedDefaultCategory(category) {
+  return Boolean(category && (
+    REMOVED_DEFAULT_CATEGORY_IDS.has(category.id) ||
+    REMOVED_DEFAULT_CATEGORY_IDS.has(category.parent_id)
+  ));
 }
 
 function sortCategories(a, b) {

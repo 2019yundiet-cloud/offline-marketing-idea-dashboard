@@ -63,15 +63,13 @@ grant select, insert, update, delete on table public.offline_marketing_categorie
 
 insert into public.offline_marketing_categories (id, name, level, parent_id, sort_order)
 values
-  ('cat_menu', '메뉴', 'major', '', 10),
-  ('cat_menu_new', '신메뉴 기획', 'sub', 'cat_menu', 11),
-  ('cat_interior', '인테리어', 'major', '', 20),
-  ('cat_interior_store', '매장 환경', 'sub', 'cat_interior', 21),
-  ('cat_marketing', '마케팅', 'major', '', 30),
-  ('cat_marketing_online', '온라인마케팅', 'sub', 'cat_marketing', 31),
-  ('cat_marketing_offline', '오프라인 마케팅', 'sub', 'cat_marketing', 32),
-  ('cat_project', '프로젝트', 'major', '', 40),
-  ('cat_project_plan', '기획안 관리', 'sub', 'cat_project', 41)
+  ('cat_interior', '인테리어', 'major', '', 10),
+  ('cat_interior_store', '매장 환경', 'sub', 'cat_interior', 11),
+  ('cat_marketing', '마케팅', 'major', '', 20),
+  ('cat_marketing_online', '온라인마케팅', 'sub', 'cat_marketing', 21),
+  ('cat_marketing_offline', '오프라인 마케팅', 'sub', 'cat_marketing', 22),
+  ('cat_project', '프로젝트', 'major', '', 30),
+  ('cat_project_plan', '기획안 관리', 'sub', 'cat_project', 31)
 on conflict (id) do nothing;
 
 create or replace view public.offline_marketing_idea_summary
