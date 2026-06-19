@@ -116,7 +116,9 @@ function bindAutosave() {
   });
   clearFiltersButton.addEventListener('click', clearQuickFilters);
   categoryTree.addEventListener('click', handleScopeClick);
-  allScopeButton.addEventListener('click', () => setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' }));
+  if (allScopeButton) {
+    allScopeButton.addEventListener('click', () => setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' }));
+  }
   categoryMajorSelect.addEventListener('change', () => {
     renderSubcategoryOptions(categoryMajorSelect.value, '');
     scheduleSave();
@@ -614,8 +616,12 @@ function renderScopeHeader() {
   const label = scopeLabel(state.selectedScope);
   activeScopePath.textContent = label;
   formScopeNote.textContent = label;
-  allScopeButton.classList.toggle('active', state.selectedScope.kind === 'all');
-  allScopeCount.textContent = state.ideas.filter((idea) => matchesQuickFilters(idea, state.filters)).length.toLocaleString('ko-KR');
+  if (allScopeButton) {
+    allScopeButton.classList.toggle('active', state.selectedScope.kind === 'all');
+  }
+  if (allScopeCount) {
+    allScopeCount.textContent = state.ideas.filter((idea) => matchesQuickFilters(idea, state.filters)).length.toLocaleString('ko-KR');
+  }
 }
 
 function updateScopeControlledFields() {
