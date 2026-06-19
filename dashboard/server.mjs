@@ -16,6 +16,9 @@ const USERS = ['준호', '동원', '보미', '상준'];
 const STORES = ['머문래', '갤러리문래'];
 const STATUSES = ['idea', 'discussion', 'planning', 'progress', 'done'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+const MAX_LINKS = 12;
+const MAX_ATTACHMENTS = 4;
+const MAX_ATTACHMENT_DATA_URL_LENGTH = 700000;
 
 loadDotEnv(path.join(repoRoot, '.env'));
 
@@ -147,6 +150,8 @@ function normalizeIdea(input, now) {
   const clientId = stringValue(safeInput.client_id) || createClientId();
   const createdAt = stringValue(safeInput.created_at) || now;
   const tags = normalizeTags(safeInput.tags);
+  const links = normalizeLinks(safeInput.links || safeInput.payload?.links || '');
+  const attachments = normalizeAttachments(safeInput.attachments || safeInput.payload?.attachments || []);
   return {
     client_id: clientId,
     title: stringValue(safeInput.title),
@@ -159,9 +164,13 @@ function normalizeIdea(input, now) {
     expected_impact: stringValue(safeInput.expected_impact),
     next_action: stringValue(safeInput.next_action),
     tags,
+    links,
+    attachments,
     payload: {
       source: 'idea-dashboard',
-      raw: safeInput.payload?.raw || {}
+      raw: safeInput.payload?.raw || {},
+      links,
+      attachments
     },
     saved_from: 'idea-dashboard',
     created_at: createdAt,
@@ -235,6 +244,8 @@ function toSupabaseRow(idea) {
     expected_impact: idea.expected_impact,
     next_action: idea.next_action,
     tags: idea.tags,
+    links: idea.links,
+    attachments: idea.attachments,
     payload: idea.payload,
     saved_from: idea.saved_from
   };
@@ -253,6 +264,8 @@ function fromSupabaseRow(row) {
     expected_impact: row.expected_impact || '',
     next_action: row.next_action || '',
     tags: row.tags || [],
+    links: normalizeLinks(row.links || row.payload?.links || []),
+    attachments: normalizeAttachments(row.attachments || row.payload?.attachments || []),
     payload: row.payload || {},
     saved_from: row.saved_from || 'idea-dashboard',
     created_at: row.created_at,
@@ -289,6 +302,72 @@ function normalizeTags(value) {
     .filter(Boolean);
 }
 
+function normalizeLinks(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeLink).filter(Boolean).slice(0, MAX_LINKS);
+  }
+  return stringValue(value)
+    .split(/\r?\n/)
+    .map(normalizeLink)
+    .filter(Boolean)
+    .slice(0, MAX_LINKS);
+}
+
+function normalizeLink(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const line = typeof value === 'string' ? value.trim() : '';
+  const parts = line ? line.split('|') : [];
+  const labelText = source.label || (parts.length > 1 ? parts.shift().trim() : '');
+  const urlText = source.url || (parts.length ? parts.join('|').trim() : line);
+  const url = normalizeHttpUrl(urlText);
+  if (!url) return null;
+  const label = stringValue(labelText || deriveLinkLabel(url));
+  return {
+    id: stringValue(source.id) || stableId('link', `${label}|${url}`),
+    label,
+    url
+  };
+}
+
+function normalizeHttpUrl(value) {
+  let candidate = stringValue(value);
+  if (!candidate) return '';
+  if (!/^https?:\/\//i.test(candidate)) candidate = `https://${candidate}`;
+  try {
+    const url = new URL(candidate);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function deriveLinkLabel(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+function normalizeAttachments(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, MAX_ATTACHMENTS).map((item) => {
+    const dataUrl = stringValue(item?.data_url);
+    if (!dataUrl.startsWith('data:image/')) return null;
+    if (dataUrl.length > MAX_ATTACHMENT_DATA_URL_LENGTH) return null;
+    const name = stringValue(item?.name) || 'photo.jpg';
+    return {
+      id: stringValue(item?.id) || stableId('photo', `${name}|${dataUrl.slice(0, 80)}`),
+      kind: 'image',
+      name,
+      type: stringValue(item?.type) || 'image/jpeg',
+      size: Number(item?.size || 0),
+      data_url: dataUrl,
+      created_at: stringValue(item?.created_at)
+    };
+  }).filter(Boolean);
+}
+
 function stringValue(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
@@ -301,6 +380,15 @@ function allowedValue(value, allowed) {
 
 function createClientId() {
   return `idea_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function stableId(prefix, value) {
+  let hash = 0;
+  const text = String(value);
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+  return `${prefix}_${Math.abs(hash).toString(36)}`;
 }
 
 function sendJson(res, status, body) {

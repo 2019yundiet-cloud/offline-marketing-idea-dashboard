@@ -181,6 +181,22 @@
                 <span>다음 액션</span>
                 <textarea name="next_action" rows="3" placeholder="누가 무엇을 언제까지 할지"></textarea>
               </label>
+              <fieldset class="attachment-field wide">
+                <legend>첨부</legend>
+                <div class="attachment-grid">
+                  <label>
+                    <span>첨부 링크</span>
+                    <textarea name="links" rows="3" placeholder="https://example.com 또는 제목 | https://example.com"></textarea>
+                  </label>
+                  <label class="photo-picker">
+                    <span>사진</span>
+                    <input id="photoInput" name="photos" type="file" accept="image/*" multiple>
+                    <strong>사진 선택</strong>
+                  </label>
+                </div>
+                <div id="photoPreview" class="photo-preview" aria-live="polite"></div>
+                <p id="mediaStatus" class="media-status" aria-live="polite"></p>
+              </fieldset>
             </div>
           </form>
 
@@ -211,6 +227,7 @@
                   <th>상태</th>
                   <th>우선순위</th>
                   <th>유형</th>
+                  <th>첨부</th>
                   <th>수정일</th>
                 </tr>
               </thead>

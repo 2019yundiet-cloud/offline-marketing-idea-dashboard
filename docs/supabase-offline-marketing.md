@@ -9,6 +9,7 @@ This setup stores the offline marketing Obsidian vault in Supabase as a queryabl
 - Frontmatter fields such as `type`, `status`, `tags`, and dates
 - Full file content for search and audit
 - Obsidian wikilinks and canvas file links as graph edges
+- Dashboard ideas with tags, links, and image attachment metadata
 
 ## One-Time Supabase Setup
 
@@ -60,6 +61,7 @@ npm run vault:sync
 
 - `offline_marketing_files`: one row per synced file
 - `offline_marketing_links`: graph edges extracted from notes and canvas files
+- `offline_marketing_ideas`: dashboard ideas, stages, owners, tags, links, and image attachments
 - `offline_marketing_campaigns`: campaign notes
 - `offline_marketing_locations`: location notes
 - `offline_marketing_partners`: partner notes

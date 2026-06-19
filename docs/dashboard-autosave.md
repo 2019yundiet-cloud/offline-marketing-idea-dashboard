@@ -20,6 +20,7 @@ Open the local URL printed by the server.
 - Fixed stores: 머문래, 갤러리문래.
 - Fixed stages: 아이디어, 논의, 상세기획, 진행, 완료.
 - Fixed tags: 메뉴, 인테리어, 온라인마케팅, 오프라인 마케팅.
+- Idea attachments: links are stored as structured URL objects; photos are compressed in the browser and stored as up to four image attachments.
 
 ## Mobile Design
 
@@ -40,6 +41,13 @@ Main table:
 
 ```text
 public.offline_marketing_ideas
+```
+
+Attachment fields:
+
+```text
+links jsonb
+attachments jsonb
 ```
 
 Summary view:

@@ -5,6 +5,9 @@ const storageMode = document.querySelector('#storageMode');
 const ideasBody = document.querySelector('#ideasBody');
 const recordCount = document.querySelector('#recordCount');
 const stageTabs = document.querySelector('#stageTabs');
+const photoInput = document.querySelector('#photoInput');
+const photoPreview = document.querySelector('#photoPreview');
+const mediaStatus = document.querySelector('#mediaStatus');
 const snapshotId = document.querySelector('#snapshotId');
 const snapshotUpdated = document.querySelector('#snapshotUpdated');
 const snapshotStorage = document.querySelector('#snapshotStorage');
@@ -35,9 +38,13 @@ const labels = {
 
 const API_IDEAS_URL = 'api/ideas';
 const LOCAL_STORAGE_KEY = 'offline-marketing-ideas:v1';
+const MAX_PHOTOS = 4;
+const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
+const PHOTO_TARGET_BYTES = 420 * 1024;
 
 const state = {
   currentClientId: createClientId(),
+  currentAttachments: [],
   ideas: [],
   selectedStage: 'all',
   saveTimer: null,
@@ -55,8 +62,16 @@ async function initialize() {
 }
 
 function bindAutosave() {
-  form.addEventListener('input', scheduleSave);
-  form.addEventListener('change', scheduleSave);
+  form.addEventListener('input', (event) => {
+    if (event.target === photoInput) return;
+    scheduleSave();
+  });
+  form.addEventListener('change', (event) => {
+    if (event.target === photoInput) return;
+    scheduleSave();
+  });
+  photoInput.addEventListener('change', handlePhotoSelect);
+  photoPreview.addEventListener('click', handlePhotoPreviewClick);
   newIdeaButton.addEventListener('click', resetForm);
   stageTabs.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-stage]');
@@ -66,6 +81,7 @@ function bindAutosave() {
     document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   ideasBody.addEventListener('click', (event) => {
+    if (event.target.closest('a, button, input, textarea, select')) return;
     const row = event.target.closest('tr[data-id]');
     if (!row) return;
     const idea = state.ideas.find((item) => item.client_id === row.dataset.id);
@@ -143,6 +159,8 @@ async function saveCurrentIdea() {
 
 function collectIdea() {
   const data = new FormData(form);
+  const links = parseLinks(data.get('links') || '');
+  const attachments = normalizeAttachments(state.currentAttachments);
   return {
     client_id: state.currentClientId,
     title: data.get('title') || '',
@@ -155,8 +173,12 @@ function collectIdea() {
     expected_impact: data.get('expected_impact') || '',
     next_action: data.get('next_action') || '',
     tags: data.getAll('tags'),
+    links,
+    attachments,
     payload: {
-      raw: Object.fromEntries(data.entries())
+      raw: rawFormData(data),
+      links,
+      attachments
     }
   };
 }
@@ -170,16 +192,21 @@ function hasMeaningfulInput(idea) {
     idea.description ||
     idea.expected_impact ||
     idea.next_action ||
-    selectedTags(idea).length
+    selectedTags(idea).length ||
+    selectedLinks(idea).length ||
+    selectedAttachments(idea).length
   );
 }
 
 function resetForm() {
   state.currentClientId = createClientId();
+  state.currentAttachments = [];
   state.lastSavedSignature = '';
   form.reset();
   form.querySelector('[name="status"]').value = 'idea';
   form.querySelector('[name="priority"]').value = 'medium';
+  renderPhotoPreview();
+  mediaStatus.textContent = '';
   updateSnapshot(null);
   setSaveState('idle', '대기');
   form.querySelector('[name="title"]').focus();
@@ -196,6 +223,10 @@ function loadIdeaIntoForm(idea) {
   form.elements.description.value = idea.description || '';
   form.elements.expected_impact.value = idea.expected_impact || '';
   form.elements.next_action.value = idea.next_action || '';
+  form.elements.links.value = formatLinks(selectedLinks(idea));
+  state.currentAttachments = selectedAttachments(idea);
+  renderPhotoPreview();
+  mediaStatus.textContent = '';
   setSelectedTags(selectedTags(idea));
   state.lastSavedSignature = JSON.stringify(collectIdea());
   updateSnapshot(idea);
@@ -249,7 +280,7 @@ function renderTable() {
     : state.ideas.filter((idea) => normalizeStatus(idea.status) === state.selectedStage);
   recordCount.textContent = `${visibleIdeas.length}개`;
   if (!visibleIdeas.length) {
-    ideasBody.innerHTML = '<tr class="empty-row"><td colspan="7">아이디어 없음</td></tr>';
+    ideasBody.innerHTML = '<tr class="empty-row"><td colspan="8">아이디어 없음</td></tr>';
     return;
   }
   ideasBody.innerHTML = visibleIdeas.slice(0, 120).map((idea) => `
@@ -258,12 +289,14 @@ function renderTable() {
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
         <small>${escapeHtml(summaryText(idea.description))}</small>
         ${renderTags(idea.tags)}
+        ${renderLinks(idea.links)}
       </td>
       <td data-label="매장">${escapeHtml(idea.store || '')}</td>
       <td data-label="담당자">${escapeHtml(idea.owner || '')}</td>
       <td data-label="상태"><span class="chip status-${escapeHtml(normalizeStatus(idea.status))}">${escapeHtml(statusName(idea.status))}</span></td>
       <td data-label="우선순위"><span class="chip priority-${escapeHtml(idea.priority || 'medium')}">${escapeHtml(priorityName(idea.priority))}</span></td>
       <td data-label="유형">${escapeHtml(idea.idea_type || '')}</td>
+      <td data-label="첨부">${renderAttachmentSummary(idea)}</td>
       <td data-label="수정일">${escapeHtml(formatDateTime(idea.updated_at))}</td>
     </tr>
   `).join('');
@@ -314,6 +347,265 @@ function renderTags(tags) {
   const values = selectedTags({ tags });
   if (!values.length) return '';
   return `<span class="tag-line">${values.map((tag) => `<em>${escapeHtml(tag)}</em>`).join('')}</span>`;
+}
+
+async function handlePhotoSelect() {
+  const files = Array.from(photoInput.files || []);
+  if (!files.length) return;
+
+  const remainingSlots = Math.max(0, MAX_PHOTOS - state.currentAttachments.length);
+  const messages = [];
+  const additions = [];
+
+  if (remainingSlots === 0) {
+    messages.push(`사진은 최대 ${MAX_PHOTOS}장까지 저장됩니다.`);
+  }
+
+  for (const file of files.slice(0, remainingSlots)) {
+    try {
+      additions.push(await fileToAttachment(file));
+    } catch (error) {
+      messages.push(`${file.name}: ${error.message}`);
+    }
+  }
+
+  if (files.length > remainingSlots) {
+    messages.push(`사진은 최대 ${MAX_PHOTOS}장까지 저장됩니다.`);
+  }
+
+  if (additions.length) {
+    state.currentAttachments = normalizeAttachments([...state.currentAttachments, ...additions]);
+    renderPhotoPreview();
+    scheduleSave();
+  }
+
+  photoInput.value = '';
+  mediaStatus.textContent = messages.join(' ');
+}
+
+function handlePhotoPreviewClick(event) {
+  const button = event.target.closest('button[data-remove-photo]');
+  if (!button) return;
+  state.currentAttachments = state.currentAttachments.filter((item) => item.id !== button.dataset.removePhoto);
+  renderPhotoPreview();
+  scheduleSave();
+}
+
+function renderPhotoPreview() {
+  const attachments = selectedAttachments({ attachments: state.currentAttachments });
+  if (!attachments.length) {
+    photoPreview.innerHTML = '';
+    return;
+  }
+
+  photoPreview.innerHTML = attachments.map((attachment) => `
+    <figure class="photo-card">
+      <img src="${escapeHtml(attachment.data_url)}" alt="${escapeHtml(attachment.name)}">
+      <figcaption>
+        <span>${escapeHtml(attachment.name)}</span>
+        <button type="button" data-remove-photo="${escapeHtml(attachment.id)}" aria-label="${escapeHtml(`${attachment.name} 삭제`)}">삭제</button>
+      </figcaption>
+    </figure>
+  `).join('');
+}
+
+async function fileToAttachment(file) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('이미지 파일만 추가할 수 있습니다.');
+  }
+  if (file.size > MAX_ORIGINAL_PHOTO_BYTES) {
+    throw new Error('8MB 이하 이미지만 추가할 수 있습니다.');
+  }
+
+  const dataUrl = await resizeImageFile(file);
+  return {
+    id: createAttachmentId(),
+    kind: 'image',
+    name: file.name || 'photo.jpg',
+    type: 'image/jpeg',
+    size: estimateDataUrlBytes(dataUrl),
+    data_url: dataUrl,
+    created_at: new Date().toISOString()
+  };
+}
+
+async function resizeImageFile(file) {
+  const source = await readFileAsDataUrl(file);
+  const image = await loadImage(source);
+  const maxSides = [1400, 1100, 900, 700];
+  const qualities = [0.82, 0.72, 0.62];
+  let fallback = source;
+
+  for (const maxSide of maxSides) {
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    for (const quality of qualities) {
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      fallback = dataUrl;
+      if (estimateDataUrlBytes(dataUrl) <= PHOTO_TARGET_BYTES) return dataUrl;
+    }
+  }
+
+  return fallback;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(reader.result));
+    reader.addEventListener('error', () => reject(new Error('사진을 읽지 못했습니다.')));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => resolve(image));
+    image.addEventListener('error', () => reject(new Error('사진을 처리하지 못했습니다.')));
+    image.src = dataUrl;
+  });
+}
+
+function estimateDataUrlBytes(dataUrl) {
+  const base64 = String(dataUrl).split(',')[1] || '';
+  return Math.round(base64.length * 0.75);
+}
+
+function selectedLinks(idea) {
+  const source = idea.links || idea.payload?.links || [];
+  return normalizeLinks(source);
+}
+
+function normalizeLinks(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeLink).filter(Boolean).slice(0, 12);
+  }
+  return parseLinks(value);
+}
+
+function parseLinks(value) {
+  return String(value || '')
+    .split(/\r?\n/)
+    .map(normalizeLink)
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function normalizeLink(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const line = typeof value === 'string' ? value.trim() : '';
+  const parts = line ? line.split('|') : [];
+  const labelText = source.label || (parts.length > 1 ? parts.shift().trim() : '');
+  const urlText = source.url || (parts.length ? parts.join('|').trim() : line);
+  const url = normalizeHttpUrl(urlText);
+  if (!url) return null;
+  const label = String(labelText || deriveLinkLabel(url)).trim();
+  return {
+    id: source.id || stableId('link', `${label}|${url}`),
+    label,
+    url
+  };
+}
+
+function normalizeHttpUrl(value) {
+  let candidate = String(value || '').trim();
+  if (!candidate) return '';
+  if (!/^https?:\/\//i.test(candidate)) candidate = `https://${candidate}`;
+  try {
+    const url = new URL(candidate);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function deriveLinkLabel(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+function formatLinks(links) {
+  return selectedLinks({ links })
+    .map((link) => `${link.label} | ${link.url}`)
+    .join('\n');
+}
+
+function renderLinks(links) {
+  const values = selectedLinks({ links });
+  if (!values.length) return '';
+  return `<span class="link-line">${values.slice(0, 3).map((link) => (
+    `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label)}</a>`
+  )).join('')}</span>`;
+}
+
+function selectedAttachments(idea) {
+  const source = idea.attachments || idea.payload?.attachments || [];
+  return normalizeAttachments(source);
+}
+
+function normalizeAttachments(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, MAX_PHOTOS).map((item) => {
+    const dataUrl = String(item?.data_url || '');
+    if (!dataUrl.startsWith('data:image/')) return null;
+    const name = String(item?.name || 'photo.jpg').trim() || 'photo.jpg';
+    return {
+      id: String(item?.id || stableId('photo', `${name}|${dataUrl.slice(0, 80)}`)),
+      kind: 'image',
+      name,
+      type: String(item?.type || 'image/jpeg'),
+      size: Number(item?.size || estimateDataUrlBytes(dataUrl)),
+      data_url: dataUrl,
+      created_at: String(item?.created_at || '')
+    };
+  }).filter(Boolean);
+}
+
+function renderAttachmentSummary(idea) {
+  const photoCount = selectedAttachments(idea).length;
+  const linkCount = selectedLinks(idea).length;
+  if (!photoCount && !linkCount) return '';
+  return [
+    photoCount ? `<span class="attachment-count">사진 ${photoCount}</span>` : '',
+    linkCount ? `<span class="attachment-count">링크 ${linkCount}</span>` : ''
+  ].filter(Boolean).join('');
+}
+
+function rawFormData(data) {
+  const raw = {};
+  for (const [key, value] of data.entries()) {
+    if (key === 'photos') continue;
+    const normalized = value instanceof File ? value.name : value;
+    if (raw[key] === undefined) raw[key] = normalized;
+    else raw[key] = Array.isArray(raw[key]) ? [...raw[key], normalized] : [raw[key], normalized];
+  }
+  return raw;
+}
+
+function createAttachmentId() {
+  return `photo_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function stableId(prefix, value) {
+  let hash = 0;
+  const text = String(value);
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+  return `${prefix}_${Math.abs(hash).toString(36)}`;
 }
 
 function normalizeStatus(value) {
@@ -369,6 +661,8 @@ function saveBrowserIdea(idea) {
     tags: Array.isArray(idea.tags)
       ? idea.tags
       : String(idea.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean),
+    links: selectedLinks(idea),
+    attachments: selectedAttachments(idea),
     created_at: idea.created_at || now,
     updated_at: now,
     remote_status: 'browser_only'
