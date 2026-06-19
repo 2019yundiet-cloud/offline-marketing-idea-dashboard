@@ -3,8 +3,11 @@ const newIdeaButton = document.querySelector('#newIdeaButton');
 const saveStatus = document.querySelector('#saveStatus');
 const storageMode = document.querySelector('#storageMode');
 const ideasBody = document.querySelector('#ideasBody');
+const ideasBoard = document.querySelector('#ideasBoard');
+const ideasTableWrap = document.querySelector('#ideasTableWrap');
 const recordCount = document.querySelector('#recordCount');
 const stageTabs = document.querySelector('#stageTabs');
+const viewModeButtons = document.querySelectorAll('[data-view-mode]');
 const quickFilters = document.querySelector('#quickFilters');
 const projectSearch = document.querySelector('#projectSearch');
 const clearFiltersButton = document.querySelector('#clearFiltersButton');
@@ -57,12 +60,20 @@ const API_CATEGORIES_URL = 'api/categories';
 const LOCAL_STORAGE_KEY = 'offline-marketing-ideas:v1';
 const CATEGORY_STORAGE_KEY = 'offline-marketing-categories:v1';
 const CATEGORY_COLLAPSE_STORAGE_KEY = 'offline-marketing-category-collapse:v1';
+const VIEW_MODE_STORAGE_KEY = 'offline-marketing-view-mode:v1';
 const MAX_PHOTOS = 4;
 const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const STORES = ['머문래', '갤러리문래'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
+const DUE_FILTERS = [
+  { value: 'all', label: '전체' },
+  { value: 'overdue', label: '지연' },
+  { value: 'today', label: '오늘' },
+  { value: 'week', label: '이번 주' },
+  { value: 'none', label: '기한 없음' }
+];
 const DEFAULT_CATEGORIES = [
   { id: 'cat_interior', level: 'major', parent_id: '', name: '인테리어', sort_order: 10 },
   { id: 'cat_interior_store', level: 'sub', parent_id: 'cat_interior', name: '매장 환경', sort_order: 11 },
@@ -82,7 +93,8 @@ const state = {
   selectedScope: { kind: 'all', major: '', subcategory: '', store: '' },
   collapsedMajors: readCollapsedMajors(),
   selectedStage: 'all',
-  filters: { owner: 'all', store: 'all', workType: 'all', query: '' },
+  filters: { owner: 'all', store: 'all', workType: 'all', due: 'all', query: '' },
+  viewMode: readViewMode(),
   saveTimer: null,
   pendingRequest: Promise.resolve(),
   lastSavedSignature: ''
@@ -125,6 +137,9 @@ function bindAutosave() {
     scheduleSave();
   });
   newIdeaButton.addEventListener('click', resetForm);
+  for (const button of viewModeButtons) {
+    button.addEventListener('click', () => setViewMode(button.dataset.viewMode));
+  }
   stageTabs.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-stage]');
     if (!button) return;
@@ -145,6 +160,20 @@ function bindAutosave() {
     if (!row) return;
     event.preventDefault();
     const idea = state.ideas.find((item) => item.client_id === row.dataset.id);
+    if (idea) loadIdeaIntoForm(idea);
+  });
+  ideasBoard.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-id]');
+    if (!card) return;
+    const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
+    if (idea) loadIdeaIntoForm(idea);
+  });
+  ideasBoard.addEventListener('keydown', (event) => {
+    if (!['Enter', ' '].includes(event.key)) return;
+    const card = event.target.closest('[data-id]');
+    if (!card) return;
+    event.preventDefault();
+    const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
     if (idea) loadIdeaIntoForm(idea);
   });
 }
@@ -236,6 +265,7 @@ function collectIdea() {
     owner: data.get('owner') || '',
     status: data.get('status') || 'idea',
     priority: data.get('priority') || 'medium',
+    due_date: normalizeDateInput(data.get('due_date') || ''),
     idea_type: data.get('idea_type') || '',
     description: data.get('description') || '',
     expected_impact: data.get('expected_impact') || '',
@@ -257,6 +287,7 @@ function hasMeaningfulInput(idea) {
     idea.project_name ||
     idea.store ||
     idea.owner ||
+    idea.due_date ||
     idea.idea_type ||
     idea.description ||
     idea.expected_impact ||
@@ -293,6 +324,7 @@ function loadIdeaIntoForm(idea) {
   form.elements.owner.value = idea.owner || '';
   form.elements.status.value = normalizeStatus(idea.status);
   form.elements.priority.value = idea.priority || 'medium';
+  form.elements.due_date.value = normalizeDateInput(idea.due_date || '');
   form.elements.idea_type.value = idea.idea_type || '';
   form.elements.description.value = idea.description || '';
   form.elements.expected_impact.value = idea.expected_impact || '';
@@ -322,7 +354,7 @@ function render() {
   renderCategoryTree();
   renderMetrics();
   renderStageTabs();
-  renderTable();
+  renderRecords();
 }
 
 function renderMetrics() {
@@ -352,17 +384,36 @@ function renderStageTabs() {
   }
 }
 
-function renderTable() {
+function visibleIdeas() {
   const scoped = scopedIdeas();
-  const visibleIdeas = state.selectedStage === 'all'
+  return state.selectedStage === 'all'
     ? scoped
     : scoped.filter((idea) => normalizeStatus(idea.status) === state.selectedStage);
-  recordCount.textContent = `${visibleIdeas.length}개 · ${viewLabel()}`;
-  if (!visibleIdeas.length) {
-    ideasBody.innerHTML = '<tr class="empty-row"><td colspan="9">기획안 없음</td></tr>';
+}
+
+function renderRecords() {
+  const ideas = visibleIdeas();
+  recordCount.textContent = `${ideas.length}개 · ${viewLabel()}`;
+  renderViewMode();
+  renderTable(ideas);
+  renderBoard(ideas);
+}
+
+function renderViewMode() {
+  const isBoard = state.viewMode === 'board';
+  ideasTableWrap.hidden = isBoard;
+  ideasBoard.hidden = !isBoard;
+  for (const button of viewModeButtons) {
+    button.classList.toggle('active', button.dataset.viewMode === state.viewMode);
+  }
+}
+
+function renderTable(ideas) {
+  if (!ideas.length) {
+    ideasBody.innerHTML = '<tr class="empty-row"><td colspan="10">기획안 없음</td></tr>';
     return;
   }
-  ideasBody.innerHTML = visibleIdeas.slice(0, 120).map((idea) => `
+  ideasBody.innerHTML = ideas.slice(0, 120).map((idea) => `
     <tr data-id="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
       <td data-label="제목">
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
@@ -375,11 +426,48 @@ function renderTable() {
       <td data-label="담당자">${escapeHtml(idea.owner || '')}</td>
       <td data-label="상태"><span class="chip status-${escapeHtml(normalizeStatus(idea.status))}">${escapeHtml(statusName(idea.status))}</span></td>
       <td data-label="우선순위"><span class="chip priority-${escapeHtml(idea.priority || 'medium')}">${escapeHtml(priorityName(idea.priority))}</span></td>
+      <td data-label="기한">${renderDueBadge(idea)}</td>
       <td data-label="유형">${escapeHtml(idea.idea_type || '')}</td>
       <td data-label="첨부">${renderAttachmentSummary(idea)}</td>
       <td data-label="수정일">${escapeHtml(formatDateTime(idea.updated_at))}</td>
     </tr>
   `).join('');
+}
+
+function renderBoard(ideas) {
+  const columns = Object.entries(labels.status);
+  ideasBoard.innerHTML = columns.map(([status, label]) => {
+    const items = ideas.filter((idea) => normalizeStatus(idea.status) === status);
+    return `
+      <section class="board-column">
+        <header>
+          <span>${escapeHtml(label)}</span>
+          <strong>${items.length.toLocaleString('ko-KR')}</strong>
+        </header>
+        <div class="board-card-list">
+          ${items.length ? items.map(renderBoardCard).join('') : '<p class="board-column-empty">비어 있음</p>'}
+        </div>
+      </section>
+    `;
+  }).join('');
+}
+
+function renderBoardCard(idea) {
+  return `
+    <article class="board-card" data-id="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
+      <div class="board-card-topline">
+        <span>${escapeHtml(normalizeWorkType(idea.work_type))}</span>
+        ${renderDueBadge(idea)}
+      </div>
+      <h4>${escapeHtml(idea.title || '제목 없음')}</h4>
+      ${idea.project_name ? `<p class="board-project">${escapeHtml(idea.project_name)}</p>` : ''}
+      <p>${escapeHtml(summaryText(idea.description || idea.next_action || '내용 없음'))}</p>
+      <footer>
+        <span>${escapeHtml(idea.owner || '담당자 미정')}</span>
+        <span>${escapeHtml(idea.store || '매장 전체')}</span>
+      </footer>
+    </article>
+  `;
 }
 
 function updateSnapshot(idea) {
@@ -412,6 +500,10 @@ function statusName(value) {
 
 function priorityName(value) {
   return labels.priority[value] || value || '';
+}
+
+function dueFilterName(value) {
+  return DUE_FILTERS.find((filter) => filter.value === value)?.label || '';
 }
 
 function selectedTags(idea) {
@@ -451,7 +543,7 @@ function handleQuickFilterClick(event) {
 }
 
 function clearQuickFilters() {
-  state.filters = { owner: 'all', store: 'all', workType: 'all', query: '' };
+  state.filters = { owner: 'all', store: 'all', workType: 'all', due: 'all', query: '' };
   projectSearch.value = '';
   setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' });
 }
@@ -460,6 +552,7 @@ function renderQuickFilters() {
   renderScopeFilterLane('major');
   renderScopeFilterLane('subcategory');
   renderFilterLane('owner', USERS);
+  renderDueFilterLane();
   renderFilterLane('store', STORES);
   renderFilterLane('workType', WORK_TYPES);
   clearFiltersButton.disabled = !hasActiveQuickFilters();
@@ -535,6 +628,22 @@ function renderFilterLane(key, values) {
   }).join('');
 }
 
+function renderDueFilterLane() {
+  const container = quickFilters.querySelector('[data-filter-options="due"]');
+  if (!container) return;
+  container.innerHTML = DUE_FILTERS.map((option) => {
+    const active = state.filters.due === option.value;
+    return `
+      <button type="button" class="${active ? 'active' : ''}"
+        data-filter-key="due"
+        data-filter-value="${escapeHtml(option.value)}">
+        <span>${escapeHtml(option.label)}</span>
+        <strong>${countForFilter('due', option.value).toLocaleString('ko-KR')}</strong>
+      </button>
+    `;
+  }).join('');
+}
+
 function countForFilter(key, value) {
   const filters = { ...state.filters, [key]: value };
   return state.ideas.filter((idea) => matchesScope(idea, state.selectedScope) && matchesQuickFilters(idea, filters)).length;
@@ -545,6 +654,7 @@ function hasActiveQuickFilters() {
     state.filters.owner !== 'all' ||
     state.filters.store !== 'all' ||
     state.filters.workType !== 'all' ||
+    state.filters.due !== 'all' ||
     Boolean(state.filters.query);
 }
 
@@ -553,9 +663,20 @@ function viewLabel() {
     state.filters.owner !== 'all' ? state.filters.owner : '',
     state.filters.store !== 'all' ? state.filters.store : '',
     state.filters.workType !== 'all' ? state.filters.workType : '',
+    state.filters.due !== 'all' ? dueFilterName(state.filters.due) : '',
     state.filters.query ? `"${state.filters.query}"` : ''
   ].filter(Boolean);
   return [scopeLabel(state.selectedScope), ...filters].join(' · ');
+}
+
+function setViewMode(mode) {
+  state.viewMode = mode === 'board' ? 'board' : 'list';
+  try {
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, state.viewMode);
+  } catch {
+    // View mode can fall back to list without affecting stored ideas.
+  }
+  renderRecords();
 }
 
 function handleScopeClick(event) {
@@ -734,7 +855,24 @@ function matchesQuickFilters(idea, filters) {
   if (filters.owner !== 'all' && idea.owner !== filters.owner) return false;
   if (filters.store !== 'all' && idea.store !== filters.store) return false;
   if (filters.workType !== 'all' && normalizeWorkType(idea.work_type) !== filters.workType) return false;
+  if (filters.due !== 'all' && !matchesDueFilter(idea, filters.due)) return false;
   if (filters.query && !matchesQuery(idea, filters.query)) return false;
+  return true;
+}
+
+function matchesDueFilter(idea, filter) {
+  const dueDate = normalizeDateInput(idea.due_date || idea.payload?.due_date || '');
+  const status = normalizeStatus(idea.status);
+  if (filter === 'none') return !dueDate;
+  if (!dueDate) return false;
+  const dueTime = dateOnlyTime(dueDate);
+  const today = todayTime();
+  if (filter === 'overdue') return status !== 'done' && dueTime < today;
+  if (filter === 'today') return dueTime === today;
+  if (filter === 'week') {
+    const weekEnd = today + (6 * 24 * 60 * 60 * 1000);
+    return dueTime >= today && dueTime <= weekEnd;
+  }
   return true;
 }
 
@@ -1170,6 +1308,22 @@ function renderAttachmentSummary(idea) {
   ].filter(Boolean).join('');
 }
 
+function renderDueBadge(idea) {
+  const dueDate = normalizeDateInput(idea.due_date || idea.payload?.due_date || '');
+  if (!dueDate) return '<span class="due-badge muted">-</span>';
+  const tone = dueTone(idea, dueDate);
+  return `<span class="due-badge ${escapeHtml(tone)}">${escapeHtml(formatDate(dueDate))}</span>`;
+}
+
+function dueTone(idea, dueDate) {
+  if (normalizeStatus(idea.status) === 'done') return 'done';
+  const diff = dateOnlyTime(dueDate) - todayTime();
+  if (diff < 0) return 'overdue';
+  if (diff === 0) return 'today';
+  if (diff <= 6 * 24 * 60 * 60 * 1000) return 'soon';
+  return 'muted';
+}
+
 function rawFormData(data) {
   const raw = {};
   for (const [key, value] of data.entries()) {
@@ -1221,6 +1375,32 @@ function formatDateTime(value) {
   });
 }
 
+function formatDate(value) {
+  if (!value) return '';
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return `${month.toString().padStart(2, '0')}.${day.toString().padStart(2, '0')}`;
+}
+
+function normalizeDateInput(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return '';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) return '';
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+function dateOnlyTime(value) {
+  const [year, month, day] = normalizeDateInput(value).split('-').map(Number);
+  return new Date(year, month - 1, day).getTime();
+}
+
+function todayTime() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -1259,4 +1439,12 @@ function saveBrowserIdea(idea) {
   else ideas.unshift(saved);
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(ideas));
   return saved;
+}
+
+function readViewMode() {
+  try {
+    return localStorage.getItem(VIEW_MODE_STORAGE_KEY) === 'board' ? 'board' : 'list';
+  } catch {
+    return 'list';
+  }
 }

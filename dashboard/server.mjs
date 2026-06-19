@@ -126,13 +126,19 @@ async function serveStatic(requestPath, res) {
   }
   try {
     const stat = await fs.stat(fullPath);
-    if (!stat.isFile()) return sendText(res, 404, 'Not found');
+    let servedPath = fullPath;
+    let servedStat = stat;
+    if (stat.isDirectory()) {
+      servedPath = path.join(fullPath, 'index.html');
+      servedStat = await fs.stat(servedPath);
+    }
+    if (!servedStat.isFile()) return sendText(res, 404, 'Not found');
     res.writeHead(200, {
-      'Content-Type': contentType(fullPath),
-      'Content-Length': stat.size,
+      'Content-Type': contentType(servedPath),
+      'Content-Length': servedStat.size,
       'Cache-Control': 'no-store'
     });
-    createReadStream(fullPath).pipe(res);
+    createReadStream(servedPath).pipe(res);
   } catch {
     sendText(res, 404, 'Not found');
   }
@@ -219,6 +225,7 @@ function normalizeIdea(input, now) {
     owner: allowedValue(safeInput.owner, USERS),
     status: allowedValue(safeInput.status, STATUSES) || 'idea',
     priority: allowedValue(safeInput.priority, PRIORITIES) || 'medium',
+    due_date: normalizeDateInput(safeInput.due_date || safeInput.payload?.due_date || safeInput.payload?.raw?.due_date),
     idea_type: stringValue(safeInput.idea_type),
     description: stringValue(safeInput.description),
     expected_impact: stringValue(safeInput.expected_impact),
@@ -231,6 +238,7 @@ function normalizeIdea(input, now) {
       raw: safeInput.payload?.raw || {},
       links,
       attachments,
+      due_date: normalizeDateInput(safeInput.due_date || safeInput.payload?.due_date || safeInput.payload?.raw?.due_date),
       category: {
         major: stringValue(safeInput.category_major),
         subcategory: stringValue(safeInput.category_sub)
@@ -337,6 +345,7 @@ function toSupabaseRow(idea) {
     owner: idea.owner,
     status: idea.status,
     priority: idea.priority,
+    due_date: idea.due_date,
     idea_type: idea.idea_type,
     description: idea.description,
     expected_impact: idea.expected_impact,
@@ -361,6 +370,7 @@ function fromSupabaseRow(row) {
     owner: row.owner || '',
     status: row.status || 'idea',
     priority: row.priority || 'medium',
+    due_date: normalizeDateInput(row.due_date || row.payload?.due_date || row.payload?.raw?.due_date),
     idea_type: row.idea_type || '',
     description: row.description || '',
     expected_impact: row.expected_impact || '',
@@ -548,6 +558,15 @@ function stringValue(value) {
 function allowedValue(value, allowed) {
   const candidate = stringValue(value);
   return allowed.includes(candidate) ? candidate : '';
+}
+
+function normalizeDateInput(value) {
+  const text = stringValue(value);
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return '';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) return '';
+  return `${match[1]}-${match[2]}-${match[3]}`;
 }
 
 function createClientId() {

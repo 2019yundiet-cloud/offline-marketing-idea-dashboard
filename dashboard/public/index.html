@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>오프라인 마케팅 아이디어 대시보드</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260619-redesign">
+    <link rel="stylesheet" href="styles.css?v=20260619-options">
   </head>
   <body>
     <div class="app-shell">
@@ -18,6 +18,7 @@
             <p>카테고리 · 프로젝트 · 매장</p>
           </div>
         </div>
+        <a class="design-lab-link" href="designs/index.html" target="_blank" rel="noreferrer">디자인 시안 10개 보기</a>
         <section class="scope-panel" aria-label="카테고리 관리">
           <button type="button" id="allScopeButton" class="scope-root active">
             <span>전체 업무</span>
@@ -114,6 +115,10 @@
               <span>팀원</span>
               <div class="filter-pills" data-filter-options="owner"></div>
             </div>
+            <div class="filter-lane" data-filter-key="due">
+              <span>기한</span>
+              <div class="filter-pills" data-filter-options="due"></div>
+            </div>
             <div class="filter-lane" data-filter-key="store">
               <span>매장</span>
               <div class="filter-pills" data-filter-options="store"></div>
@@ -127,10 +132,16 @@
 
         <section id="records" class="records-section">
           <div class="section-heading">
-            <h3>기획안 목록</h3>
-            <span id="recordCount">0개</span>
+            <div>
+              <h3>기획안 목록</h3>
+              <span id="recordCount">0개</span>
+            </div>
+            <div class="records-tools" aria-label="보기 방식">
+              <button type="button" data-view-mode="list" class="active">목록</button>
+              <button type="button" data-view-mode="board">보드</button>
+            </div>
           </div>
-          <div class="table-wrap">
+          <div class="table-wrap" id="ideasTableWrap">
             <table>
               <thead>
                 <tr>
@@ -140,6 +151,7 @@
                   <th>담당자</th>
                   <th>상태</th>
                   <th>우선순위</th>
+                  <th>기한</th>
                   <th>유형</th>
                   <th>첨부</th>
                   <th>수정일</th>
@@ -148,6 +160,7 @@
               <tbody id="ideasBody"></tbody>
             </table>
           </div>
+          <div id="ideasBoard" class="board-view" hidden></div>
         </section>
 
         <section id="input" class="input-layout">
@@ -230,6 +243,10 @@
                 </select>
               </label>
               <label>
+                <span>기한</span>
+                <input name="due_date" type="date">
+              </label>
+              <label>
                 <span>유형</span>
                 <select name="idea_type">
                   <option value="">선택</option>
@@ -274,6 +291,6 @@
         </section>
       </main>
     </div>
-    <script src="app.js?v=20260619-redesign" type="module"></script>
+    <script src="app.js?v=20260619-options" type="module"></script>
   </body>
 </html>

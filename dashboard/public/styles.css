@@ -112,6 +112,24 @@ button:hover {
   font-size: 12px;
 }
 
+.design-lab-link {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.design-lab-link:hover {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
 .scope-panel {
   display: grid;
   gap: 16px;
@@ -533,6 +551,42 @@ button:hover {
   margin-bottom: 16px;
 }
 
+.section-heading > div {
+  min-width: 0;
+}
+
+.section-heading span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.records-tools {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.records-tools button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.records-tools button.active {
+  background: #111;
+  color: #fff;
+}
+
 .form-header h3,
 .side-panel h3,
 .section-heading h3 {
@@ -927,6 +981,136 @@ td small {
   margin-left: 5px;
 }
 
+.due-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border: 1px solid var(--line);
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.due-badge.today,
+.due-badge.soon {
+  border-color: #111;
+  color: #111;
+}
+
+.due-badge.overdue {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.due-badge.done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.board-view {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(190px, 1fr));
+  gap: 12px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.board-view[hidden],
+.table-wrap[hidden] {
+  display: none;
+}
+
+.board-column {
+  min-width: 190px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.board-column header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 12px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.board-card-list {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.board-card {
+  display: grid;
+  gap: 9px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  padding: 12px;
+  cursor: pointer;
+}
+
+.board-card:hover,
+.board-card:focus-visible {
+  border-color: #111;
+  outline: none;
+}
+
+.board-card-topline,
+.board-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.board-card h4,
+.board-card p,
+.board-column-empty {
+  margin: 0;
+}
+
+.board-card h4 {
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.board-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.board-card .board-project {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.board-column-empty,
+.board-empty {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.board-empty {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  padding: 28px;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -1014,6 +1198,10 @@ td small {
 
   .brand {
     width: min(100%, 720px);
+  }
+
+  .design-lab-link {
+    display: none;
   }
 
   .input-layout,
@@ -1199,6 +1387,14 @@ td small {
     padding: 0 16px;
   }
 
+  .records-tools {
+    width: 100%;
+  }
+
+  .records-tools button {
+    flex: 1 1 0;
+  }
+
   .status-strip {
     align-items: flex-end;
     flex-direction: column;
@@ -1230,6 +1426,25 @@ td small {
     display: grid;
     gap: 12px;
     padding: 0 16px;
+  }
+
+  .board-view {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 0 16px 2px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .board-view[hidden] {
+    display: none;
+  }
+
+  .board-column {
+    flex: 0 0 min(82vw, 320px);
+    scroll-snap-align: start;
   }
 
   tbody tr[data-id] {
