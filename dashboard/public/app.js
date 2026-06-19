@@ -10,8 +10,12 @@ const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
 const allScopeCount = document.querySelector('#allScopeCount');
 const activeScopePath = document.querySelector('#activeScopePath');
+const formScopeNote = document.querySelector('#formScopeNote');
 const categoryMajorSelect = document.querySelector('#categoryMajorSelect');
 const categorySubSelect = document.querySelector('#categorySubSelect');
+const scopeFieldMajor = document.querySelector('[data-scope-field="category_major"]');
+const scopeFieldSubcategory = document.querySelector('[data-scope-field="category_sub"]');
+const scopeFieldStore = document.querySelector('[data-scope-field="store"]');
 const photoInput = document.querySelector('#photoInput');
 const photoPreview = document.querySelector('#photoPreview');
 const mediaStatus = document.querySelector('#mediaStatus');
@@ -358,6 +362,7 @@ function upsertIdea(idea) {
 
 function render() {
   renderScopeHeader();
+  updateScopeControlledFields();
   renderCategoryTree();
   renderMetrics();
   renderStageTabs();
@@ -497,8 +502,16 @@ function applyScopeDefaultsToForm() {
 function renderScopeHeader() {
   const label = scopeLabel(state.selectedScope);
   activeScopePath.textContent = label;
+  formScopeNote.textContent = label;
   allScopeButton.classList.toggle('active', state.selectedScope.kind === 'all');
   allScopeCount.textContent = state.ideas.length.toLocaleString('ko-KR');
+}
+
+function updateScopeControlledFields() {
+  const scope = normalizeScope(state.selectedScope);
+  scopeFieldMajor.hidden = scope.kind !== 'all';
+  scopeFieldSubcategory.hidden = ['subcategory', 'store'].includes(scope.kind);
+  scopeFieldStore.hidden = scope.kind === 'store';
 }
 
 function renderCategoryTree() {

@@ -108,7 +108,10 @@
         <section id="input" class="input-layout">
           <form id="ideaForm" class="entry-form" autocomplete="off">
             <div class="form-header">
-              <h3>기획안 입력</h3>
+              <div>
+                <h3>기획안 입력</h3>
+                <p id="formScopeNote" class="form-scope-note">전체 업무</p>
+              </div>
               <button type="button" id="newIdeaButton">새 기획안</button>
             </div>
 
@@ -130,19 +133,19 @@
                 <span>프로젝트명</span>
                 <input name="project_name" type="text" placeholder="예: 7월 매장 유입 캠페인">
               </label>
-              <label>
+              <label data-scope-field="category_major">
                 <span>대카테고리</span>
                 <select id="categoryMajorSelect" name="category_major">
                   <option value="">선택</option>
                 </select>
               </label>
-              <label>
+              <label data-scope-field="category_sub">
                 <span>소카테고리</span>
                 <select id="categorySubSelect" name="category_sub">
                   <option value="">선택</option>
                 </select>
               </label>
-              <label>
+              <label data-scope-field="store">
                 <span>매장</span>
                 <select name="store">
                   <option value="">선택</option>
