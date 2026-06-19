@@ -21,6 +21,7 @@ Open the local URL printed by the server.
 - Fixed stages: 아이디어, 논의, 상세기획, 진행, 완료.
 - Fixed tags: 메뉴, 인테리어, 온라인마케팅, 오프라인 마케팅.
 - Idea attachments: links are stored as structured URL objects; photos are compressed in the browser and stored as up to four image attachments.
+- Planning categories: the sidebar stores major categories, subcategories, and store-level filters. Records can be typed as 아이디어, 기획안, 프로젝트, or 업무.
 
 ## Mobile Design
 
@@ -48,6 +49,21 @@ Attachment fields:
 ```text
 links jsonb
 attachments jsonb
+```
+
+Planning fields:
+
+```text
+work_type text
+project_name text
+category_major text
+category_sub text
+```
+
+Category table:
+
+```text
+public.offline_marketing_categories
 ```
 
 Summary view:

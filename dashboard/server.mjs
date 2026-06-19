@@ -11,14 +11,27 @@ const repoRoot = path.resolve(__dirname, '..');
 const publicDir = path.join(__dirname, 'public');
 const dataDir = path.join(repoRoot, 'data');
 const ideasFile = path.join(dataDir, 'dashboard-ideas.json');
+const categoriesFile = path.join(dataDir, 'dashboard-categories.json');
 
 const USERS = ['준호', '동원', '보미', '상준'];
 const STORES = ['머문래', '갤러리문래'];
 const STATUSES = ['idea', 'discussion', 'planning', 'progress', 'done'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
 const MAX_LINKS = 12;
 const MAX_ATTACHMENTS = 4;
 const MAX_ATTACHMENT_DATA_URL_LENGTH = 700000;
+const DEFAULT_CATEGORIES = [
+  { id: 'cat_menu', level: 'major', parent_id: '', name: '메뉴', sort_order: 10 },
+  { id: 'cat_menu_new', level: 'sub', parent_id: 'cat_menu', name: '신메뉴 기획', sort_order: 11 },
+  { id: 'cat_interior', level: 'major', parent_id: '', name: '인테리어', sort_order: 20 },
+  { id: 'cat_interior_store', level: 'sub', parent_id: 'cat_interior', name: '매장 환경', sort_order: 21 },
+  { id: 'cat_marketing', level: 'major', parent_id: '', name: '마케팅', sort_order: 30 },
+  { id: 'cat_marketing_online', level: 'sub', parent_id: 'cat_marketing', name: '온라인마케팅', sort_order: 31 },
+  { id: 'cat_marketing_offline', level: 'sub', parent_id: 'cat_marketing', name: '오프라인 마케팅', sort_order: 32 },
+  { id: 'cat_project', level: 'major', parent_id: '', name: '프로젝트', sort_order: 40 },
+  { id: 'cat_project_plan', level: 'sub', parent_id: 'cat_project', name: '기획안 관리', sort_order: 41 }
+];
 
 loadDotEnv(path.join(repoRoot, '.env'));
 
@@ -30,6 +43,7 @@ const supabaseEnabled = Boolean(supabaseUrl && serviceRoleKey);
 
 await fs.mkdir(dataDir, { recursive: true });
 await ensureJsonFile(ideasFile, []);
+await ensureJsonFile(categoriesFile, DEFAULT_CATEGORIES);
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -49,10 +63,21 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ideas, supabaseEnabled, users: USERS, stores: STORES });
     }
 
+    if (url.pathname === '/api/categories' && req.method === 'GET') {
+      const categories = await readCategories();
+      return sendJson(res, 200, { categories, supabaseEnabled, stores: STORES });
+    }
+
     if (url.pathname === '/api/ideas' && req.method === 'POST') {
       const body = await readJsonBody(req);
       const saved = await saveIdea(body);
       return sendJson(res, 200, { idea: saved, supabaseEnabled });
+    }
+
+    if (url.pathname === '/api/categories' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const saved = await saveCategory(body);
+      return sendJson(res, 200, { category: saved, supabaseEnabled });
     }
 
     if (req.method === 'GET' || req.method === 'HEAD') {
@@ -125,6 +150,17 @@ async function readIdeas() {
   return readLocalIdeas();
 }
 
+async function readCategories() {
+  if (supabaseEnabled) {
+    try {
+      return mergeCategories(await readSupabaseCategories());
+    } catch (error) {
+      console.warn(`Supabase category read failed, using local file: ${error.message}`);
+    }
+  }
+  return mergeCategories(await readLocalCategories());
+}
+
 async function saveIdea(input) {
   const now = new Date().toISOString();
   const idea = normalizeIdea(input, now);
@@ -145,6 +181,27 @@ async function saveIdea(input) {
   return idea;
 }
 
+async function saveCategory(input) {
+  const now = new Date().toISOString();
+  const category = normalizeCategory({ ...input, updated_at: now, created_at: input?.created_at || now });
+  if (!category) throw new Error('invalid_category');
+  await saveLocalCategory(category);
+  if (supabaseEnabled) {
+    try {
+      await saveSupabaseCategory(category);
+      category.remote_status = 'synced';
+    } catch (error) {
+      console.warn(`Supabase category write failed, kept local save: ${error.message}`);
+      category.remote_status = 'local_only';
+      category.remote_error = error.message;
+    }
+  } else {
+    category.remote_status = 'local_only';
+  }
+  await saveLocalCategory(category);
+  return category;
+}
+
 function normalizeIdea(input, now) {
   const safeInput = input && typeof input === 'object' ? input : {};
   const clientId = stringValue(safeInput.client_id) || createClientId();
@@ -155,6 +212,10 @@ function normalizeIdea(input, now) {
   return {
     client_id: clientId,
     title: stringValue(safeInput.title),
+    work_type: allowedValue(safeInput.work_type, WORK_TYPES) || '아이디어',
+    project_name: stringValue(safeInput.project_name),
+    category_major: stringValue(safeInput.category_major),
+    category_sub: stringValue(safeInput.category_sub),
     store: allowedValue(safeInput.store, STORES),
     owner: allowedValue(safeInput.owner, USERS),
     status: allowedValue(safeInput.status, STATUSES) || 'idea',
@@ -170,7 +231,11 @@ function normalizeIdea(input, now) {
       source: 'idea-dashboard',
       raw: safeInput.payload?.raw || {},
       links,
-      attachments
+      attachments,
+      category: {
+        major: stringValue(safeInput.category_major),
+        subcategory: stringValue(safeInput.category_sub)
+      }
     },
     saved_from: 'idea-dashboard',
     created_at: createdAt,
@@ -184,6 +249,11 @@ async function readLocalIdeas() {
   return ideas.sort(sortIdeas);
 }
 
+async function readLocalCategories() {
+  const text = await fs.readFile(categoriesFile, 'utf8');
+  return mergeCategories(JSON.parse(text));
+}
+
 async function saveLocalIdea(idea) {
   const ideas = await readLocalIdeas();
   const index = ideas.findIndex((item) => item.client_id === idea.client_id);
@@ -192,10 +262,24 @@ async function saveLocalIdea(idea) {
   await fs.writeFile(ideasFile, `${JSON.stringify(ideas.sort(sortIdeas), null, 2)}\n`, 'utf8');
 }
 
+async function saveLocalCategory(category) {
+  const categories = await readLocalCategories();
+  const index = categories.findIndex((item) => item.id === category.id);
+  if (index >= 0) categories[index] = { ...categories[index], ...category };
+  else categories.push(category);
+  await fs.writeFile(categoriesFile, `${JSON.stringify(mergeCategories(categories), null, 2)}\n`, 'utf8');
+}
+
 async function readSupabaseIdeas() {
   const endpoint = `${supabaseUrl}/rest/v1/offline_marketing_ideas?select=*&order=updated_at.desc&limit=500`;
   const response = await supabaseFetch(endpoint, { method: 'GET' });
   return response.map(fromSupabaseRow);
+}
+
+async function readSupabaseCategories() {
+  const endpoint = `${supabaseUrl}/rest/v1/offline_marketing_categories?select=*&order=sort_order.asc,name.asc`;
+  const response = await supabaseFetch(endpoint, { method: 'GET' });
+  return response.map(fromSupabaseCategory).filter(Boolean);
 }
 
 async function saveSupabaseIdea(idea) {
@@ -206,6 +290,17 @@ async function saveSupabaseIdea(idea) {
       Prefer: 'resolution=merge-duplicates,return=minimal'
     },
     body: JSON.stringify(toSupabaseRow(idea))
+  });
+}
+
+async function saveSupabaseCategory(category) {
+  const endpoint = `${supabaseUrl}/rest/v1/offline_marketing_categories?on_conflict=id`;
+  await supabaseFetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Prefer: 'resolution=merge-duplicates,return=minimal'
+    },
+    body: JSON.stringify(toSupabaseCategory(category))
   });
 }
 
@@ -235,6 +330,10 @@ function toSupabaseRow(idea) {
   return {
     client_id: idea.client_id,
     title: idea.title,
+    work_type: idea.work_type,
+    project_name: idea.project_name,
+    category_major: idea.category_major,
+    category_sub: idea.category_sub,
     store: idea.store,
     owner: idea.owner,
     status: idea.status,
@@ -255,6 +354,10 @@ function fromSupabaseRow(row) {
   return {
     client_id: row.client_id,
     title: row.title || '',
+    work_type: row.work_type || '아이디어',
+    project_name: row.project_name || '',
+    category_major: row.category_major || row.payload?.category?.major || '',
+    category_sub: row.category_sub || row.payload?.category?.subcategory || '',
     store: row.store || '',
     owner: row.owner || '',
     status: row.status || 'idea',
@@ -272,6 +375,31 @@ function fromSupabaseRow(row) {
     updated_at: row.updated_at,
     remote_status: 'synced'
   };
+}
+
+function toSupabaseCategory(category) {
+  return {
+    id: category.id,
+    name: category.name,
+    level: category.level,
+    parent_id: category.parent_id,
+    sort_order: category.sort_order,
+    payload: category.payload || {}
+  };
+}
+
+function fromSupabaseCategory(row) {
+  return normalizeCategory({
+    id: row.id,
+    name: row.name,
+    level: row.level,
+    parent_id: row.parent_id || '',
+    sort_order: row.sort_order,
+    payload: row.payload || {},
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    remote_status: 'synced'
+  });
 }
 
 async function readJsonBody(req) {
@@ -368,6 +496,43 @@ function normalizeAttachments(value) {
   }).filter(Boolean);
 }
 
+function mergeCategories(categories) {
+  const merged = new Map();
+  for (const category of DEFAULT_CATEGORIES) {
+    const normalized = normalizeCategory(category);
+    if (normalized) merged.set(normalized.id, normalized);
+  }
+  for (const category of categories || []) {
+    const normalized = normalizeCategory(category);
+    if (normalized) merged.set(normalized.id, normalized);
+  }
+  return [...merged.values()].sort(sortCategories);
+}
+
+function normalizeCategory(category) {
+  const name = stringValue(category?.name);
+  const level = category?.level === 'sub' ? 'sub' : 'major';
+  const parentId = level === 'sub' ? stringValue(category?.parent_id) : '';
+  const id = stringValue(category?.id) || createCategoryId(level, name, parentId);
+  if (!name) return null;
+  return {
+    id,
+    name,
+    level,
+    parent_id: parentId,
+    sort_order: Number(category?.sort_order || 999),
+    payload: category?.payload || {},
+    created_at: stringValue(category?.created_at),
+    updated_at: stringValue(category?.updated_at),
+    remote_status: category?.remote_status,
+    remote_error: category?.remote_error
+  };
+}
+
+function sortCategories(a, b) {
+  return (a.sort_order - b.sort_order) || a.name.localeCompare(b.name, 'ko-KR');
+}
+
 function stringValue(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
@@ -380,6 +545,10 @@ function allowedValue(value, allowed) {
 
 function createClientId() {
   return `idea_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createCategoryId(level, name, parentId) {
+  return stableId('cat', `${level}|${parentId}|${name}`);
 }
 
 function stableId(prefix, value) {

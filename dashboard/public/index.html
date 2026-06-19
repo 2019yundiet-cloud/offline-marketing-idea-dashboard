@@ -14,12 +14,30 @@
         <div class="brand">
           <span class="brand-mark"><img src="financier.svg" alt=""></span>
           <div>
-            <h1>아이디어 관리</h1>
-            <p>준호 · 동원 · 보미 · 상준</p>
+            <h1>기획안 관리</h1>
+            <p>카테고리 · 프로젝트 · 매장</p>
           </div>
         </div>
+        <section class="scope-panel" aria-label="카테고리 관리">
+          <button type="button" id="allScopeButton" class="scope-root active">
+            <span>전체 업무</span>
+            <strong id="allScopeCount">0</strong>
+          </button>
+          <form id="categoryForm" class="category-form" autocomplete="off">
+            <label>
+              <span>대카테고리</span>
+              <input name="major" type="text" placeholder="마케팅">
+            </label>
+            <label>
+              <span>소카테고리</span>
+              <input name="subcategory" type="text" placeholder="오프라인 캠페인">
+            </label>
+            <button type="submit">카테고리 추가</button>
+          </form>
+          <div id="categoryTree" class="category-tree" aria-label="카테고리 트리"></div>
+        </section>
         <nav class="nav-list" aria-label="대시보드">
-          <a href="#input" class="active">아이디어</a>
+          <a href="#input" class="active">입력</a>
           <a href="#overview">요약</a>
           <a href="#records">목록</a>
         </nav>
@@ -28,8 +46,8 @@
       <main class="workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Auto Save</p>
-            <h2>아이디어 보드</h2>
+            <p class="eyebrow" id="activeScopePath">전체 업무</p>
+            <h2>기획안 보드</h2>
           </div>
           <div class="status-strip" aria-live="polite">
             <span id="storageMode">확인 중</span>
@@ -90,14 +108,39 @@
         <section id="input" class="input-layout">
           <form id="ideaForm" class="entry-form" autocomplete="off">
             <div class="form-header">
-              <h3>아이디어 입력</h3>
-              <button type="button" id="newIdeaButton">새 아이디어</button>
+              <h3>기획안 입력</h3>
+              <button type="button" id="newIdeaButton">새 기획안</button>
             </div>
 
             <div class="form-grid">
               <label class="wide">
-                <span>아이디어 제목</span>
+                <span>기획/아이디어 제목</span>
                 <input name="title" type="text" placeholder="예: 머문래 점심시간 샘플링 이벤트">
+              </label>
+              <label>
+                <span>작업 구분</span>
+                <select name="work_type">
+                  <option value="아이디어">아이디어</option>
+                  <option value="기획안">기획안</option>
+                  <option value="프로젝트">프로젝트</option>
+                  <option value="업무">업무</option>
+                </select>
+              </label>
+              <label>
+                <span>프로젝트명</span>
+                <input name="project_name" type="text" placeholder="예: 7월 매장 유입 캠페인">
+              </label>
+              <label>
+                <span>대카테고리</span>
+                <select id="categoryMajorSelect" name="category_major">
+                  <option value="">선택</option>
+                </select>
+              </label>
+              <label>
+                <span>소카테고리</span>
+                <select id="categorySubSelect" name="category_sub">
+                  <option value="">선택</option>
+                </select>
               </label>
               <label>
                 <span>매장</span>
@@ -206,6 +249,8 @@
               <div><dt>저장 ID</dt><dd id="snapshotId">-</dd></div>
               <div><dt>마지막 저장</dt><dd id="snapshotUpdated">-</dd></div>
               <div><dt>저장 위치</dt><dd id="snapshotStorage">-</dd></div>
+              <div><dt>카테고리</dt><dd id="snapshotScope">-</dd></div>
+              <div><dt>프로젝트</dt><dd id="snapshotProject">-</dd></div>
               <div><dt>운영 매장</dt><dd>머문래 · 갤러리문래</dd></div>
               <div><dt>사용자</dt><dd>준호 · 동원 · 보미 · 상준</dd></div>
             </dl>
@@ -222,6 +267,7 @@
               <thead>
                 <tr>
                   <th>제목</th>
+                  <th>카테고리</th>
                   <th>매장</th>
                   <th>담당자</th>
                   <th>상태</th>

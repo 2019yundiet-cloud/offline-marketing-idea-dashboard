@@ -5,12 +5,21 @@ const storageMode = document.querySelector('#storageMode');
 const ideasBody = document.querySelector('#ideasBody');
 const recordCount = document.querySelector('#recordCount');
 const stageTabs = document.querySelector('#stageTabs');
+const categoryForm = document.querySelector('#categoryForm');
+const categoryTree = document.querySelector('#categoryTree');
+const allScopeButton = document.querySelector('#allScopeButton');
+const allScopeCount = document.querySelector('#allScopeCount');
+const activeScopePath = document.querySelector('#activeScopePath');
+const categoryMajorSelect = document.querySelector('#categoryMajorSelect');
+const categorySubSelect = document.querySelector('#categorySubSelect');
 const photoInput = document.querySelector('#photoInput');
 const photoPreview = document.querySelector('#photoPreview');
 const mediaStatus = document.querySelector('#mediaStatus');
 const snapshotId = document.querySelector('#snapshotId');
 const snapshotUpdated = document.querySelector('#snapshotUpdated');
 const snapshotStorage = document.querySelector('#snapshotStorage');
+const snapshotScope = document.querySelector('#snapshotScope');
+const snapshotProject = document.querySelector('#snapshotProject');
 
 const metrics = {
   idea: document.querySelector('#metricIdea'),
@@ -37,15 +46,32 @@ const labels = {
 };
 
 const API_IDEAS_URL = 'api/ideas';
+const API_CATEGORIES_URL = 'api/categories';
 const LOCAL_STORAGE_KEY = 'offline-marketing-ideas:v1';
+const CATEGORY_STORAGE_KEY = 'offline-marketing-categories:v1';
 const MAX_PHOTOS = 4;
 const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
+const STORES = ['머문래', '갤러리문래'];
+const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
+const DEFAULT_CATEGORIES = [
+  { id: 'cat_menu', level: 'major', parent_id: '', name: '메뉴', sort_order: 10 },
+  { id: 'cat_menu_new', level: 'sub', parent_id: 'cat_menu', name: '신메뉴 기획', sort_order: 11 },
+  { id: 'cat_interior', level: 'major', parent_id: '', name: '인테리어', sort_order: 20 },
+  { id: 'cat_interior_store', level: 'sub', parent_id: 'cat_interior', name: '매장 환경', sort_order: 21 },
+  { id: 'cat_marketing', level: 'major', parent_id: '', name: '마케팅', sort_order: 30 },
+  { id: 'cat_marketing_online', level: 'sub', parent_id: 'cat_marketing', name: '온라인마케팅', sort_order: 31 },
+  { id: 'cat_marketing_offline', level: 'sub', parent_id: 'cat_marketing', name: '오프라인 마케팅', sort_order: 32 },
+  { id: 'cat_project', level: 'major', parent_id: '', name: '프로젝트', sort_order: 40 },
+  { id: 'cat_project_plan', level: 'sub', parent_id: 'cat_project', name: '기획안 관리', sort_order: 41 }
+];
 
 const state = {
   currentClientId: createClientId(),
   currentAttachments: [],
+  categories: [],
   ideas: [],
+  selectedScope: { kind: 'all', major: '', subcategory: '', store: '' },
   selectedStage: 'all',
   saveTimer: null,
   pendingRequest: Promise.resolve(),
@@ -56,7 +82,9 @@ initialize();
 
 async function initialize() {
   bindAutosave();
-  await loadIdeas();
+  await Promise.all([loadIdeas(), loadCategories()]);
+  state.categories = mergeCategories(state.categories);
+  renderCategorySelects();
   render();
   setSaveState('idle', '대기');
 }
@@ -72,6 +100,13 @@ function bindAutosave() {
   });
   photoInput.addEventListener('change', handlePhotoSelect);
   photoPreview.addEventListener('click', handlePhotoPreviewClick);
+  categoryForm.addEventListener('submit', handleCategorySubmit);
+  categoryTree.addEventListener('click', handleScopeClick);
+  allScopeButton.addEventListener('click', () => setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' }));
+  categoryMajorSelect.addEventListener('change', () => {
+    renderSubcategoryOptions(categoryMajorSelect.value, '');
+    scheduleSave();
+  });
   newIdeaButton.addEventListener('click', resetForm);
   stageTabs.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-stage]');
@@ -108,6 +143,76 @@ async function loadIdeas() {
     state.ideas = readBrowserIdeas();
     storageMode.textContent = '브라우저 저장';
   }
+}
+
+async function loadCategories() {
+  try {
+    const response = await fetch(API_CATEGORIES_URL);
+    if (!response.ok) throw new Error('categories_unavailable');
+    const payload = await response.json();
+    state.categories = mergeCategories(payload.categories || []);
+  } catch {
+    state.categories = mergeCategories(readBrowserCategories());
+  }
+  saveBrowserCategories(state.categories);
+}
+
+async function handleCategorySubmit(event) {
+  event.preventDefault();
+  const data = new FormData(categoryForm);
+  const majorName = String(data.get('major') || '').trim();
+  const subcategoryName = String(data.get('subcategory') || '').trim();
+  if (!majorName && !subcategoryName) return;
+
+  const major = await ensureCategory(majorName || '기타', '', 'major');
+  let subcategory = null;
+  if (subcategoryName) {
+    subcategory = await ensureCategory(subcategoryName, major.id, 'sub');
+  }
+
+  categoryForm.reset();
+  renderCategorySelects();
+  setSelectedScope(subcategory
+    ? { kind: 'subcategory', major: major.name, subcategory: subcategory.name, store: '' }
+    : { kind: 'major', major: major.name, subcategory: '', store: '' });
+  setSaveState('saved', '카테고리 저장됨');
+}
+
+async function ensureCategory(name, parentId, level) {
+  const normalizedName = String(name || '').trim();
+  const normalizedParentId = String(parentId || '');
+  const existing = state.categories.find((category) => (
+    category.level === level &&
+    category.parent_id === normalizedParentId &&
+    category.name === normalizedName
+  ));
+  if (existing) return existing;
+
+  const category = {
+    id: createCategoryId(level, normalizedName, normalizedParentId),
+    level,
+    parent_id: normalizedParentId,
+    name: normalizedName,
+    sort_order: state.categories.length + 100,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    const response = await fetch(API_CATEGORIES_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(category)
+    });
+    if (!response.ok) throw new Error('category_save_failed');
+    const payload = await response.json();
+    upsertCategory(payload.category || category);
+  } catch {
+    upsertCategory(category);
+    saveBrowserCategories(state.categories);
+  }
+
+  return state.categories.find((item) => item.id === category.id) || category;
 }
 
 function scheduleSave() {
@@ -164,6 +269,10 @@ function collectIdea() {
   return {
     client_id: state.currentClientId,
     title: data.get('title') || '',
+    work_type: data.get('work_type') || '아이디어',
+    project_name: data.get('project_name') || '',
+    category_major: data.get('category_major') || '',
+    category_sub: data.get('category_sub') || '',
     store: data.get('store') || '',
     owner: data.get('owner') || '',
     status: data.get('status') || 'idea',
@@ -186,6 +295,7 @@ function collectIdea() {
 function hasMeaningfulInput(idea) {
   return Boolean(
     idea.title ||
+    idea.project_name ||
     idea.store ||
     idea.owner ||
     idea.idea_type ||
@@ -203,6 +313,7 @@ function resetForm() {
   state.currentAttachments = [];
   state.lastSavedSignature = '';
   form.reset();
+  applyScopeDefaultsToForm();
   form.querySelector('[name="status"]').value = 'idea';
   form.querySelector('[name="priority"]').value = 'medium';
   renderPhotoPreview();
@@ -215,6 +326,10 @@ function resetForm() {
 function loadIdeaIntoForm(idea) {
   state.currentClientId = idea.client_id;
   form.elements.title.value = idea.title || '';
+  form.elements.work_type.value = normalizeWorkType(idea.work_type);
+  form.elements.project_name.value = idea.project_name || '';
+  form.elements.category_major.value = idea.category_major || '';
+  renderSubcategoryOptions(idea.category_major || '', idea.category_sub || '');
   form.elements.store.value = idea.store || '';
   form.elements.owner.value = idea.owner || '';
   form.elements.status.value = normalizeStatus(idea.status);
@@ -242,13 +357,15 @@ function upsertIdea(idea) {
 }
 
 function render() {
+  renderScopeHeader();
+  renderCategoryTree();
   renderMetrics();
   renderStageTabs();
   renderTable();
 }
 
 function renderMetrics() {
-  const totals = state.ideas.reduce((acc, idea) => {
+  const totals = scopedIdeas().reduce((acc, idea) => {
     const status = normalizeStatus(idea.status);
     acc[status] += 1;
     return acc;
@@ -261,7 +378,7 @@ function renderMetrics() {
 }
 
 function renderStageTabs() {
-  const counts = state.ideas.reduce((acc, idea) => {
+  const counts = scopedIdeas().reduce((acc, idea) => {
     const status = normalizeStatus(idea.status);
     acc.all += 1;
     acc[status] += 1;
@@ -275,22 +392,25 @@ function renderStageTabs() {
 }
 
 function renderTable() {
+  const scoped = scopedIdeas();
   const visibleIdeas = state.selectedStage === 'all'
-    ? state.ideas
-    : state.ideas.filter((idea) => normalizeStatus(idea.status) === state.selectedStage);
-  recordCount.textContent = `${visibleIdeas.length}개`;
+    ? scoped
+    : scoped.filter((idea) => normalizeStatus(idea.status) === state.selectedStage);
+  recordCount.textContent = `${visibleIdeas.length}개 · ${scopeLabel(state.selectedScope)}`;
   if (!visibleIdeas.length) {
-    ideasBody.innerHTML = '<tr class="empty-row"><td colspan="8">아이디어 없음</td></tr>';
+    ideasBody.innerHTML = '<tr class="empty-row"><td colspan="9">기획안 없음</td></tr>';
     return;
   }
   ideasBody.innerHTML = visibleIdeas.slice(0, 120).map((idea) => `
     <tr data-id="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
       <td data-label="제목">
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
+        ${renderWorkMeta(idea)}
         <small>${escapeHtml(summaryText(idea.description))}</small>
         ${renderTags(idea.tags)}
         ${renderLinks(idea.links)}
       </td>
+      <td data-label="카테고리">${renderCategoryCell(idea)}</td>
       <td data-label="매장">${escapeHtml(idea.store || '')}</td>
       <td data-label="담당자">${escapeHtml(idea.owner || '')}</td>
       <td data-label="상태"><span class="chip status-${escapeHtml(normalizeStatus(idea.status))}">${escapeHtml(statusName(idea.status))}</span></td>
@@ -312,6 +432,8 @@ function updateSnapshot(idea) {
       : idea
         ? '로컬'
         : '-';
+  snapshotScope.textContent = idea ? ideaScopeLabel(idea) : scopeLabel(state.selectedScope);
+  snapshotProject.textContent = idea?.project_name || '-';
 }
 
 function setSaveState(kind, label) {
@@ -347,6 +469,258 @@ function renderTags(tags) {
   const values = selectedTags({ tags });
   if (!values.length) return '';
   return `<span class="tag-line">${values.map((tag) => `<em>${escapeHtml(tag)}</em>`).join('')}</span>`;
+}
+
+function handleScopeClick(event) {
+  const button = event.target.closest('button[data-scope-kind]');
+  if (!button) return;
+  setSelectedScope({
+    kind: button.dataset.scopeKind,
+    major: button.dataset.major || '',
+    subcategory: button.dataset.subcategory || '',
+    store: button.dataset.store || ''
+  });
+}
+
+function setSelectedScope(scope) {
+  state.selectedScope = normalizeScope(scope);
+  if (!state.lastSavedSignature) applyScopeDefaultsToForm();
+  render();
+}
+
+function applyScopeDefaultsToForm() {
+  form.elements.category_major.value = state.selectedScope.major || '';
+  renderSubcategoryOptions(state.selectedScope.major || '', state.selectedScope.subcategory || '');
+  form.elements.store.value = state.selectedScope.store || '';
+}
+
+function renderScopeHeader() {
+  const label = scopeLabel(state.selectedScope);
+  activeScopePath.textContent = label;
+  allScopeButton.classList.toggle('active', state.selectedScope.kind === 'all');
+  allScopeCount.textContent = state.ideas.length.toLocaleString('ko-KR');
+}
+
+function renderCategoryTree() {
+  const majors = majorCategories();
+  categoryTree.innerHTML = majors.map((major) => {
+    const majorScope = { kind: 'major', major: major.name, subcategory: '', store: '' };
+    const subs = subCategories(major.id);
+    const children = subs.map((subcategory) => {
+      const subScope = { kind: 'subcategory', major: major.name, subcategory: subcategory.name, store: '' };
+      const stores = STORES.map((store) => {
+        const storeScope = { kind: 'store', major: major.name, subcategory: subcategory.name, store };
+        return `
+          <button type="button" class="store-node ${scopeActive(storeScope) ? 'active' : ''}"
+            data-scope-kind="store"
+            data-major="${escapeHtml(major.name)}"
+            data-subcategory="${escapeHtml(subcategory.name)}"
+            data-store="${escapeHtml(store)}">
+            <span>${escapeHtml(store)}</span>
+            <strong>${countIdeas(storeScope).toLocaleString('ko-KR')}</strong>
+          </button>
+        `;
+      }).join('');
+
+      return `
+        <div class="subcategory-node">
+          <button type="button" class="subcategory-button ${scopeActive(subScope) ? 'active' : ''}"
+            data-scope-kind="subcategory"
+            data-major="${escapeHtml(major.name)}"
+            data-subcategory="${escapeHtml(subcategory.name)}">
+            <span>${escapeHtml(subcategory.name)}</span>
+            <strong>${countIdeas(subScope).toLocaleString('ko-KR')}</strong>
+          </button>
+          <div class="store-list">${stores}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <section class="category-group">
+        <button type="button" class="category-major ${scopeActive(majorScope) ? 'active' : ''}"
+          data-scope-kind="major"
+          data-major="${escapeHtml(major.name)}">
+          <span>${escapeHtml(major.name)}</span>
+          <strong>${countIdeas(majorScope).toLocaleString('ko-KR')}</strong>
+        </button>
+        <div class="subcategory-list">${children}</div>
+      </section>
+    `;
+  }).join('');
+}
+
+function renderCategorySelects() {
+  const selectedMajor = form.elements.category_major?.value || '';
+  const selectedSubcategory = form.elements.category_sub?.value || '';
+  const majors = majorCategories();
+  categoryMajorSelect.innerHTML = [
+    '<option value="">선택</option>',
+    ...majors.map((category) => `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`)
+  ].join('');
+  categoryMajorSelect.value = majors.some((category) => category.name === selectedMajor) ? selectedMajor : '';
+  renderSubcategoryOptions(categoryMajorSelect.value, selectedSubcategory);
+}
+
+function renderSubcategoryOptions(majorName, selectedSubcategory = form.elements.category_sub?.value || '') {
+  const major = majorCategories().find((category) => category.name === majorName);
+  const subs = major ? subCategories(major.id) : [];
+  categorySubSelect.innerHTML = [
+    '<option value="">선택</option>',
+    ...subs.map((category) => `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`)
+  ].join('');
+  categorySubSelect.value = subs.some((category) => category.name === selectedSubcategory) ? selectedSubcategory : '';
+}
+
+function scopedIdeas() {
+  return state.ideas.filter((idea) => matchesScope(idea, state.selectedScope));
+}
+
+function countIdeas(scope) {
+  return state.ideas.filter((idea) => matchesScope(idea, scope)).length;
+}
+
+function matchesScope(idea, scope) {
+  const normalized = normalizeScope(scope);
+  if (normalized.kind === 'all') return true;
+  if (normalized.major && idea.category_major !== normalized.major) return false;
+  if (normalized.subcategory && idea.category_sub !== normalized.subcategory) return false;
+  if (normalized.store && idea.store !== normalized.store) return false;
+  return true;
+}
+
+function normalizeScope(scope) {
+  const kind = ['all', 'major', 'subcategory', 'store'].includes(scope?.kind) ? scope.kind : 'all';
+  return {
+    kind,
+    major: kind === 'all' ? '' : String(scope?.major || ''),
+    subcategory: ['subcategory', 'store'].includes(kind) ? String(scope?.subcategory || '') : '',
+    store: kind === 'store' ? String(scope?.store || '') : ''
+  };
+}
+
+function scopeActive(scope) {
+  const current = normalizeScope(state.selectedScope);
+  const target = normalizeScope(scope);
+  return current.kind === target.kind &&
+    current.major === target.major &&
+    current.subcategory === target.subcategory &&
+    current.store === target.store;
+}
+
+function scopeLabel(scope) {
+  const normalized = normalizeScope(scope);
+  return [normalized.major, normalized.subcategory, normalized.store].filter(Boolean).join(' / ') || '전체 업무';
+}
+
+function ideaScopeLabel(idea) {
+  return [idea.category_major, idea.category_sub, idea.store].filter(Boolean).join(' / ') || '-';
+}
+
+function renderWorkMeta(idea) {
+  const workType = normalizeWorkType(idea.work_type);
+  const project = String(idea.project_name || '').trim();
+  return `<span class="work-meta"><em>${escapeHtml(workType)}</em>${project ? `<b>${escapeHtml(project)}</b>` : ''}</span>`;
+}
+
+function renderCategoryCell(idea) {
+  const major = String(idea.category_major || '').trim();
+  const subcategory = String(idea.category_sub || '').trim();
+  if (!major && !subcategory) return '';
+  return `<span class="category-path">${[major, subcategory].filter(Boolean).map(escapeHtml).join(' / ')}</span>`;
+}
+
+function normalizeWorkType(value) {
+  const candidate = String(value || '').trim();
+  return WORK_TYPES.includes(candidate) ? candidate : '아이디어';
+}
+
+function majorCategories() {
+  return state.categories
+    .filter((category) => category.level === 'major')
+    .sort(sortCategories);
+}
+
+function subCategories(parentId) {
+  return state.categories
+    .filter((category) => category.level === 'sub' && category.parent_id === parentId)
+    .sort(sortCategories);
+}
+
+function upsertCategory(category) {
+  const normalized = normalizeCategory(category);
+  if (!normalized) return;
+  const index = state.categories.findIndex((item) => item.id === normalized.id);
+  if (index >= 0) state.categories[index] = { ...state.categories[index], ...normalized };
+  else state.categories.push(normalized);
+  state.categories = mergeCategories(state.categories);
+  saveBrowserCategories(state.categories);
+}
+
+function mergeCategories(categories) {
+  const merged = new Map();
+  for (const category of DEFAULT_CATEGORIES) {
+    const normalized = normalizeCategory(category);
+    if (normalized) merged.set(normalized.id, normalized);
+  }
+  for (const category of categories || []) {
+    const normalized = normalizeCategory(category);
+    if (normalized) merged.set(normalized.id, normalized);
+  }
+  for (const idea of state.ideas) {
+    const majorName = String(idea.category_major || '').trim();
+    const subcategoryName = String(idea.category_sub || '').trim();
+    if (!majorName) continue;
+    const majorId = createCategoryId('major', majorName, '');
+    if (!merged.has(majorId)) {
+      merged.set(majorId, normalizeCategory({ id: majorId, level: 'major', parent_id: '', name: majorName, sort_order: 500 }));
+    }
+    if (subcategoryName) {
+      const subId = createCategoryId('sub', subcategoryName, majorId);
+      if (!merged.has(subId)) {
+        merged.set(subId, normalizeCategory({ id: subId, level: 'sub', parent_id: majorId, name: subcategoryName, sort_order: 501 }));
+      }
+    }
+  }
+  return [...merged.values()].sort(sortCategories);
+}
+
+function normalizeCategory(category) {
+  const id = String(category?.id || '').trim();
+  const name = String(category?.name || '').trim();
+  const level = category?.level === 'sub' ? 'sub' : 'major';
+  const parentId = level === 'sub' ? String(category?.parent_id || '').trim() : '';
+  if (!id || !name) return null;
+  return {
+    id,
+    level,
+    parent_id: parentId,
+    name,
+    sort_order: Number(category?.sort_order || 999),
+    created_at: category?.created_at || '',
+    updated_at: category?.updated_at || ''
+  };
+}
+
+function sortCategories(a, b) {
+  return (a.sort_order - b.sort_order) || a.name.localeCompare(b.name, 'ko-KR');
+}
+
+function createCategoryId(level, name, parentId) {
+  return stableId('cat', `${level}|${parentId}|${name}`);
+}
+
+function readBrowserCategories() {
+  try {
+    const raw = localStorage.getItem(CATEGORY_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : DEFAULT_CATEGORIES;
+  } catch {
+    return DEFAULT_CATEGORIES;
+  }
+}
+
+function saveBrowserCategories(categories) {
+  localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(mergeCategories(categories)));
 }
 
 async function handlePhotoSelect() {
