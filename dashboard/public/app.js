@@ -126,12 +126,18 @@ function bindAutosave() {
   });
   photoInput.addEventListener('change', handlePhotoSelect);
   photoPreview.addEventListener('click', handlePhotoPreviewClick);
-  quickFilters.addEventListener('click', handleQuickFilterClick);
-  projectSearch.addEventListener('input', () => {
-    state.filters.query = projectSearch.value.trim();
-    render();
-  });
-  clearFiltersButton.addEventListener('click', clearQuickFilters);
+  if (quickFilters) {
+    quickFilters.addEventListener('click', handleQuickFilterClick);
+  }
+  if (projectSearch) {
+    projectSearch.addEventListener('input', () => {
+      state.filters.query = projectSearch.value.trim();
+      render();
+    });
+  }
+  if (clearFiltersButton) {
+    clearFiltersButton.addEventListener('click', clearQuickFilters);
+  }
   storeWarRoom.addEventListener('click', handleStoreWarRoomClick);
   projectGroups.addEventListener('click', handleProjectBoardClick);
   projectGroups.addEventListener('keydown', handleProjectBoardKeydown);
@@ -358,7 +364,7 @@ function render() {
   renderScopeHeader();
   updateScopeControlledFields();
   renderStoreWarRoom();
-  renderQuickFilters();
+  if (quickFilters) renderQuickFilters();
   renderCategoryTree();
   renderMetrics();
   renderStageTabs();
@@ -657,7 +663,7 @@ function handleProjectBoardClick(event) {
   const projectButton = event.target.closest('[data-project-name]');
   if (projectButton) {
     state.filters.query = projectButton.dataset.projectName || '';
-    projectSearch.value = state.filters.query;
+    if (projectSearch) projectSearch.value = state.filters.query;
     render();
     document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
@@ -698,18 +704,21 @@ function handleQuickFilterClick(event) {
 
 function clearQuickFilters() {
   state.filters = { owner: 'all', store: 'all', workType: 'all', due: 'all', query: '' };
-  projectSearch.value = '';
+  if (projectSearch) projectSearch.value = '';
   setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' });
 }
 
 function renderQuickFilters() {
+  if (!quickFilters) return;
   renderScopeFilterLane('major');
   renderScopeFilterLane('subcategory');
   renderFilterLane('owner', USERS);
   renderDueFilterLane();
   renderFilterLane('store', STORES);
   renderFilterLane('workType', WORK_TYPES);
-  clearFiltersButton.disabled = !hasActiveQuickFilters();
+  if (clearFiltersButton) {
+    clearFiltersButton.disabled = !hasActiveQuickFilters();
+  }
 }
 
 function renderScopeFilterLane(kind) {
