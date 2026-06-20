@@ -1659,7 +1659,7 @@ function renderProgress() {
   }).join('');
 
   renderProgressList(storeProgress, STORES.map((store) => progressRow(store, ideas.filter((idea) => idea.store === store))));
-  renderProgressList(ownerProgress, USERS.map((owner) => progressRow(owner, ideas.filter((idea) => idea.owner === owner))));
+  renderTeamProgressList(ownerProgress, ideas);
 }
 
 function progressRow(label, ideas) {
@@ -1691,6 +1691,43 @@ function renderProgressList(container, rows) {
       <b>${row.rate}%</b>
     </article>
   `).join('');
+}
+
+function renderTeamProgressList(container, ideas) {
+  if (!container) return;
+  container.innerHTML = TEAMS.map((team) => {
+    const teamIdeas = ideas.filter((idea) => team.members.includes(idea.owner));
+    const teamRow = progressRow(team.name, teamIdeas);
+    const memberRows = team.members.map((member) => progressRow(member, ideas.filter((idea) => idea.owner === member)));
+    return `
+      <section class="team-progress-group">
+        <header>
+          <div>
+            <strong>${escapeHtml(team.name)}</strong>
+            <span>전체 ${teamRow.total.toLocaleString('ko-KR')} · 완료 ${teamRow.done.toLocaleString('ko-KR')} · 진행 ${teamRow.doing.toLocaleString('ko-KR')}</span>
+          </div>
+          <b>${teamRow.rate}%</b>
+        </header>
+        <div class="progress-row-meter team-progress-meter" aria-label="${escapeHtml(`${team.name} 완료율 ${teamRow.rate}%`)}">
+          <span style="width: ${teamRow.rate}%"></span>
+        </div>
+        <div class="team-member-progress-list">
+          ${memberRows.map((row) => `
+            <article class="progress-row">
+              <div>
+                <strong>${escapeHtml(row.label)}</strong>
+                <span>완료 ${row.done.toLocaleString('ko-KR')} · 진행 ${row.doing.toLocaleString('ko-KR')} · 지연 ${row.overdue.toLocaleString('ko-KR')}</span>
+              </div>
+              <div class="progress-row-meter" aria-label="${escapeHtml(`${row.label} 완료율 ${row.rate}%`)}">
+                <span style="width: ${row.rate}%"></span>
+              </div>
+              <b>${row.rate}%</b>
+            </article>
+          `).join('')}
+        </div>
+      </section>
+    `;
+  }).join('');
 }
 
 function updateSnapshot(idea) {

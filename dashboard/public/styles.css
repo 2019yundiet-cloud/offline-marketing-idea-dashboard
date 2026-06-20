@@ -1445,6 +1445,61 @@ button:hover {
   background: #111;
 }
 
+.team-progress-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.team-progress-group > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.team-progress-group > header div {
+  min-width: 0;
+}
+
+.team-progress-group > header strong,
+.team-progress-group > header span {
+  display: block;
+}
+
+.team-progress-group > header strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.team-progress-group > header span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.team-progress-group > header b {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.team-progress-meter {
+  height: 10px;
+}
+
+.team-member-progress-list {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
 body.modal-open {
   overflow: hidden;
 }
