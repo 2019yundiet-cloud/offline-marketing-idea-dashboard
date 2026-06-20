@@ -316,6 +316,36 @@ button:hover {
   font-size: 13px;
 }
 
+.account-button,
+.account-ghost-button {
+  min-height: 34px;
+  border-color: var(--line);
+  border-radius: 10px;
+  padding: 0 11px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.account-button {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.account-button:hover,
+.account-button:focus-visible {
+  background: #111;
+  color: #fff;
+}
+
+.account-ghost-button:hover,
+.account-ghost-button:focus-visible {
+  border-color: #111;
+  background: #fff;
+  color: #111;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -1504,6 +1534,101 @@ body.modal-open {
   overflow: hidden;
 }
 
+body.auth-open {
+  overflow: hidden;
+}
+
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+}
+
+.auth-modal[hidden] {
+  display: none;
+}
+
+.auth-card {
+  display: grid;
+  gap: 22px;
+  width: min(100%, 420px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  padding: 24px;
+}
+
+.auth-card > header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.auth-card h2,
+.auth-card p {
+  margin: 0;
+}
+
+.auth-card header p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.auth-card h2 {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 760;
+}
+
+.auth-form,
+.account-form {
+  display: grid;
+  gap: 14px;
+}
+
+.account-form[hidden] {
+  display: none;
+}
+
+.auth-form .primary-action,
+.account-form .primary-action {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+  font-weight: 900;
+}
+
+.auth-form .primary-action:hover,
+.account-form .primary-action:hover,
+.auth-form .primary-action:focus-visible,
+.account-form .primary-action:focus-visible {
+  background: #111;
+  color: #fff;
+}
+
+.auth-message {
+  min-height: 18px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1.45;
+}
+
+.auth-message.error {
+  color: var(--danger);
+}
+
+.auth-message.success {
+  color: var(--ok);
+}
+
 .task-modal {
   position: fixed;
   inset: 0;
@@ -1589,6 +1714,32 @@ body.modal-open {
 
 .team-request-modal-card {
   width: min(100%, 720px);
+}
+
+.account-modal-card {
+  width: min(100%, 640px);
+}
+
+.account-form {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.account-form h4,
+.account-form p {
+  margin: 0;
+}
+
+.account-form h4 {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.account-form > p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.5;
 }
 
 .request-form-grid {
@@ -2986,6 +3137,29 @@ td small {
 
   .empty-row td::before {
     display: none;
+  }
+
+  .status-strip {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 160px;
+  }
+
+  .account-button,
+  .account-ghost-button {
+    min-height: 32px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .auth-modal {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .auth-card {
+    width: 100%;
+    padding: 20px;
   }
 
 }

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>Fly Space</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260620-teamprogress">
+    <link rel="stylesheet" href="styles.css?v=20260620-auth">
   </head>
   <body>
     <div class="app-shell">
@@ -37,6 +37,8 @@
           <div class="status-strip" aria-live="polite">
             <span id="storageMode">확인 중</span>
             <span id="saveStatus" class="status-pill idle" hidden></span>
+            <button type="button" id="accountButton" class="account-button" hidden>로그인</button>
+            <button type="button" id="logoutButton" class="account-ghost-button" hidden>로그아웃</button>
           </div>
         </header>
 
@@ -311,6 +313,86 @@
         <button type="button" data-app-tab="requests">팀요청</button>
       </nav>
 
+      <div id="authModal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <section class="auth-card">
+          <header>
+            <span class="brand-mark"><img src="financier.svg" alt=""></span>
+            <div>
+              <p>Fly Space</p>
+              <h2 id="authTitle">담당자 로그인</h2>
+            </div>
+          </header>
+          <form id="loginForm" class="auth-form" autocomplete="off">
+            <label>
+              <span>아이디</span>
+              <select name="user_id">
+                <option value="준호">준호</option>
+                <option value="동원">동원</option>
+                <option value="보미">보미</option>
+                <option value="상준">상준</option>
+                <option value="유민">유민</option>
+              </select>
+            </label>
+            <label>
+              <span>비밀번호</span>
+              <input name="password" type="password" inputmode="numeric" placeholder="초기 비밀번호 1234">
+            </label>
+            <button type="submit" class="primary-action">로그인</button>
+            <p id="authMessage" class="auth-message" aria-live="polite"></p>
+          </form>
+        </section>
+      </div>
+
+      <div id="accountModal" class="task-modal" hidden role="dialog" aria-modal="true" aria-labelledby="accountModalTitle">
+        <button type="button" class="task-modal-backdrop" data-account-close aria-label="계정 설정 닫기"></button>
+        <section class="task-modal-card account-modal-card">
+          <header>
+            <div>
+              <p id="accountModalKicker">계정 설정</p>
+              <h3 id="accountModalTitle">내 계정</h3>
+            </div>
+            <button type="button" data-account-close>닫기</button>
+          </header>
+          <form id="passwordChangeForm" class="account-form" autocomplete="off">
+            <h4>비밀번호 변경</h4>
+            <label>
+              <span>현재 비밀번호</span>
+              <input name="current_password" type="password">
+            </label>
+            <label>
+              <span>새 비밀번호</span>
+              <input name="new_password" type="password">
+            </label>
+            <label>
+              <span>새 비밀번호 확인</span>
+              <input name="confirm_password" type="password">
+            </label>
+            <button type="submit" class="primary-action">변경</button>
+            <p id="passwordChangeMessage" class="auth-message" aria-live="polite"></p>
+          </form>
+          <form id="adminPasswordForm" class="account-form admin-account-form" autocomplete="off" hidden>
+            <h4>관리자 비밀번호 관리</h4>
+            <p>비밀번호 원문은 표시하지 않고, 필요한 경우 새 비밀번호로 초기화합니다.</p>
+            <label>
+              <span>담당자</span>
+              <select name="managed_user">
+                <option value="준호">준호</option>
+                <option value="동원">동원</option>
+                <option value="보미">보미</option>
+                <option value="상준">상준</option>
+                <option value="유민">유민</option>
+              </select>
+            </label>
+            <label>
+              <span>새 비밀번호</span>
+              <input name="managed_password" type="password" value="1234">
+            </label>
+            <button type="submit">비밀번호 초기화</button>
+            <p id="adminPasswordMessage" class="auth-message" aria-live="polite"></p>
+          </form>
+        </section>
+      </div>
+
       <div id="taskDetailModal" class="task-modal" hidden role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
         <button type="button" class="task-modal-backdrop" data-modal-close aria-label="상세 닫기"></button>
         <section class="task-modal-card">
@@ -410,6 +492,6 @@
         </form>
       </div>
     </div>
-    <script src="app.js?v=20260620-teamprogress" type="module"></script>
+    <script src="app.js?v=20260620-auth" type="module"></script>
   </body>
 </html>

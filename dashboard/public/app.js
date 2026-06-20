@@ -5,6 +5,18 @@ const editorCloseButton = document.querySelector('#editorCloseButton');
 const editorSaveButton = document.querySelector('#editorSaveButton');
 const saveStatus = document.querySelector('#saveStatus');
 const storageMode = document.querySelector('#storageMode');
+const accountButton = document.querySelector('#accountButton');
+const logoutButton = document.querySelector('#logoutButton');
+const authModal = document.querySelector('#authModal');
+const loginForm = document.querySelector('#loginForm');
+const authMessage = document.querySelector('#authMessage');
+const accountModal = document.querySelector('#accountModal');
+const accountModalTitle = document.querySelector('#accountModalTitle');
+const accountModalKicker = document.querySelector('#accountModalKicker');
+const passwordChangeForm = document.querySelector('#passwordChangeForm');
+const passwordChangeMessage = document.querySelector('#passwordChangeMessage');
+const adminPasswordForm = document.querySelector('#adminPasswordForm');
+const adminPasswordMessage = document.querySelector('#adminPasswordMessage');
 const ideasBody = document.querySelector('#ideasBody');
 const ideasBoard = document.querySelector('#ideasBoard');
 const ideasTableWrap = document.querySelector('#ideasTableWrap');
@@ -107,6 +119,8 @@ const CATEGORY_STORAGE_KEY = 'offline-marketing-categories:v1';
 const TEAM_REQUEST_STORAGE_KEY = 'fly-space-team-requests:v1';
 const TEAM_REQUEST_SEEN_STORAGE_KEY = 'fly-space-team-request-seen:v1';
 const TEAM_REQUEST_NOTIFIED_STORAGE_KEY = 'fly-space-team-request-notified:v1';
+const AUTH_STORAGE_KEY = 'fly-space-auth-users:v1';
+const AUTH_SESSION_KEY = 'fly-space-auth-session:v1';
 const CATEGORY_COLLAPSE_STORAGE_KEY = 'offline-marketing-category-collapse:v1';
 const VIEW_MODE_STORAGE_KEY = 'offline-marketing-view-mode:v1';
 const ACTOR_STORAGE_KEY = 'fly-space-current-actor:v1';
@@ -116,6 +130,8 @@ const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
 const VALID_TABS = ['home', 'tasks', 'timeline', 'progress', 'requests'];
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
+const ADMIN_USERS = ['준호'];
+const DEFAULT_AUTH_PASSWORD = '1234';
 const TEAMS = [
   { name: '기획/실행팀', members: ['동원', '상준', '유민'] },
   { name: '마케팅팀', members: ['보미', '준호'] }
@@ -166,7 +182,8 @@ const state = {
   modalIdeaId: '',
   currentRequestId: '',
   editorMode: 'create',
-  currentHistory: []
+  currentHistory: [],
+  authUser: ''
 };
 
 initialize();
@@ -205,6 +222,9 @@ function renderAppTabs() {
 }
 
 async function initialize() {
+  await ensureAuthStore();
+  state.authUser = readAuthSession();
+  bindAuthControls();
   bindAutosave();
   await Promise.all([loadIdeas(), loadCategories(), loadTeamRequests()]);
   state.categories = mergeCategories(state.categories);
@@ -214,6 +234,280 @@ async function initialize() {
   render();
   if (state.activeTab === 'timeline') queueTimelineLanding();
   setSaveState('idle', '대기');
+  syncAuthUi();
+  if (!state.authUser) openAuthModal();
+}
+
+function bindAuthControls() {
+  if (loginForm) loginForm.addEventListener('submit', handleLoginSubmit);
+  if (accountButton) accountButton.addEventListener('click', openAccountModal);
+  if (logoutButton) logoutButton.addEventListener('click', logout);
+  if (accountModal) {
+    accountModal.addEventListener('click', (event) => {
+      if (event.target.closest('[data-account-close]')) closeAccountModal();
+    });
+  }
+  if (passwordChangeForm) passwordChangeForm.addEventListener('submit', handlePasswordChange);
+  if (adminPasswordForm) adminPasswordForm.addEventListener('submit', handleAdminPasswordReset);
+}
+
+async function ensureAuthStore() {
+  const records = readAuthUsers();
+  let changed = false;
+  for (const user of USERS) {
+    if (!records[user]?.password_hash || !records[user]?.salt) {
+      records[user] = await createAuthRecord(user, DEFAULT_AUTH_PASSWORD);
+      changed = true;
+    }
+  }
+  for (const key of Object.keys(records)) {
+    if (!USERS.includes(key)) {
+      delete records[key];
+      changed = true;
+    }
+  }
+  if (changed) saveAuthUsers(records);
+}
+
+function readAuthUsers() {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    const records = raw ? JSON.parse(raw) : {};
+    return records && typeof records === 'object' ? records : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveAuthUsers(records) {
+  try {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(records));
+  } catch {
+    // Login storage is browser-local for the static dashboard.
+  }
+}
+
+async function createAuthRecord(user, password) {
+  const now = new Date().toISOString();
+  const salt = createAuthSalt();
+  return {
+    id: user,
+    salt,
+    password_hash: await hashPassword(password, salt),
+    updated_at: now,
+    updated_by: state.authUser || user
+  };
+}
+
+function readAuthSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    const session = raw ? JSON.parse(raw) : {};
+    return USERS.includes(session?.user) ? session.user : '';
+  } catch {
+    return '';
+  }
+}
+
+function writeAuthSession(user) {
+  try {
+    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({ user, at: new Date().toISOString() }));
+    localStorage.setItem(ACTOR_STORAGE_KEY, user);
+  } catch {
+    // The dashboard can still run in memory if localStorage is blocked.
+  }
+}
+
+function clearAuthSession() {
+  try {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    localStorage.removeItem(ACTOR_STORAGE_KEY);
+  } catch {
+    // Ignore blocked browser storage on logout.
+  }
+}
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  const user = loginForm.elements.user_id?.value || '';
+  const password = loginForm.elements.password?.value || '';
+  const ok = await verifyPassword(user, password);
+  if (!ok) {
+    setAuthMessage(authMessage, '아이디 또는 비밀번호를 확인해 주세요.', 'error');
+    return;
+  }
+  state.authUser = user;
+  writeAuthSession(user);
+  loginForm.reset();
+  setAuthMessage(authMessage, '', '');
+  closeAuthModal();
+  syncAuthUi();
+  render();
+}
+
+async function verifyPassword(user, password) {
+  if (!USERS.includes(user) || !password) return false;
+  const record = readAuthUsers()[user];
+  if (!record?.salt || !record?.password_hash) return false;
+  const hash = await hashPassword(password, record.salt);
+  return hash === record.password_hash;
+}
+
+function openAuthModal() {
+  if (!authModal) return;
+  authModal.hidden = false;
+  authModal.classList.add('open');
+  document.body.classList.add('auth-open');
+  requestAnimationFrame(() => loginForm?.elements.password?.focus());
+}
+
+function closeAuthModal() {
+  if (!authModal) return;
+  authModal.classList.remove('open');
+  authModal.hidden = true;
+  document.body.classList.remove('auth-open');
+}
+
+function syncAuthUi() {
+  const user = state.authUser || readAuthSession();
+  if (accountButton) {
+    accountButton.hidden = false;
+    accountButton.textContent = user ? `${user} 계정` : '로그인';
+  }
+  if (logoutButton) logoutButton.hidden = !user;
+  if (adminPasswordForm) adminPasswordForm.hidden = !isAdminUser(user);
+  if (user && authModal && !authModal.hidden) closeAuthModal();
+}
+
+function logout() {
+  state.authUser = '';
+  clearAuthSession();
+  syncAuthUi();
+  render();
+  openAuthModal();
+}
+
+function openAccountModal() {
+  if (!state.authUser) {
+    openAuthModal();
+    return;
+  }
+  if (accountModalTitle) accountModalTitle.textContent = `${state.authUser} 계정`;
+  if (accountModalKicker) {
+    accountModalKicker.textContent = isAdminUser(state.authUser) ? '관리자 계정' : '담당자 계정';
+  }
+  if (passwordChangeForm) passwordChangeForm.reset();
+  if (adminPasswordForm) {
+    adminPasswordForm.hidden = !isAdminUser(state.authUser);
+    adminPasswordForm.reset();
+    adminPasswordForm.elements.managed_password.value = DEFAULT_AUTH_PASSWORD;
+  }
+  setAuthMessage(passwordChangeMessage, '', '');
+  setAuthMessage(adminPasswordMessage, '', '');
+  accountModal.hidden = false;
+  accountModal.classList.add('open');
+  document.body.classList.add('modal-open');
+  requestAnimationFrame(() => passwordChangeForm?.elements.current_password?.focus());
+}
+
+function closeAccountModal() {
+  if (!accountModal) return;
+  accountModal.classList.remove('open');
+  accountModal.hidden = true;
+  document.body.classList.remove('modal-open');
+}
+
+async function handlePasswordChange(event) {
+  event.preventDefault();
+  const user = state.authUser;
+  const currentPassword = passwordChangeForm.elements.current_password?.value || '';
+  const newPassword = passwordChangeForm.elements.new_password?.value || '';
+  const confirmPassword = passwordChangeForm.elements.confirm_password?.value || '';
+  if (!user) return;
+  if (!(await verifyPassword(user, currentPassword))) {
+    setAuthMessage(passwordChangeMessage, '현재 비밀번호가 맞지 않습니다.', 'error');
+    return;
+  }
+  if (!validPassword(newPassword)) {
+    setAuthMessage(passwordChangeMessage, '새 비밀번호는 4자 이상으로 설정해 주세요.', 'error');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    setAuthMessage(passwordChangeMessage, '새 비밀번호 확인이 일치하지 않습니다.', 'error');
+    return;
+  }
+  await updateUserPassword(user, newPassword, user);
+  passwordChangeForm.reset();
+  setAuthMessage(passwordChangeMessage, '비밀번호가 변경되었습니다.', 'success');
+}
+
+async function handleAdminPasswordReset(event) {
+  event.preventDefault();
+  if (!isAdminUser(state.authUser)) {
+    setAuthMessage(adminPasswordMessage, '관리자만 변경할 수 있습니다.', 'error');
+    return;
+  }
+  const user = adminPasswordForm.elements.managed_user?.value || '';
+  const password = adminPasswordForm.elements.managed_password?.value || '';
+  if (!USERS.includes(user)) {
+    setAuthMessage(adminPasswordMessage, '담당자를 선택해 주세요.', 'error');
+    return;
+  }
+  if (!validPassword(password)) {
+    setAuthMessage(adminPasswordMessage, '새 비밀번호는 4자 이상으로 설정해 주세요.', 'error');
+    return;
+  }
+  await updateUserPassword(user, password, state.authUser);
+  adminPasswordForm.elements.managed_password.value = DEFAULT_AUTH_PASSWORD;
+  setAuthMessage(adminPasswordMessage, `${user} 비밀번호를 초기화했습니다.`, 'success');
+}
+
+async function updateUserPassword(user, password, actor) {
+  const records = readAuthUsers();
+  const record = await createAuthRecord(user, password);
+  records[user] = {
+    ...record,
+    updated_by: actor,
+    updated_at: new Date().toISOString()
+  };
+  saveAuthUsers(records);
+}
+
+function validPassword(password) {
+  return String(password || '').length >= 4;
+}
+
+function isAdminUser(user = state.authUser) {
+  return ADMIN_USERS.includes(user);
+}
+
+function setAuthMessage(element, message, tone) {
+  if (!element) return;
+  element.textContent = message;
+  element.className = `auth-message ${tone || ''}`.trim();
+}
+
+function createAuthSalt() {
+  const bytes = new Uint8Array(16);
+  if (window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+    return bytesToHex(bytes);
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+}
+
+async function hashPassword(password, salt) {
+  const value = `${salt}:${password}`;
+  if (window.crypto?.subtle) {
+    const bytes = new TextEncoder().encode(value);
+    const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+    return bytesToHex(new Uint8Array(digest));
+  }
+  return stableId('auth', value);
+}
+
+function bytesToHex(bytes) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function bindAutosave() {
@@ -1944,6 +2238,10 @@ function handleTaskModalKeydown(event) {
     closeTeamRequestModal();
     return;
   }
+  if (event.key === 'Escape' && accountModal && !accountModal.hidden) {
+    closeAccountModal();
+    return;
+  }
   if (event.key === 'Escape' && inputModal && !inputModal.hidden) {
     closeEditorModal();
   }
@@ -2499,6 +2797,8 @@ function timelinePartLabel(idea) {
 }
 
 function currentActor() {
+  const sessionUser = state.authUser || readAuthSession();
+  if (USERS.includes(sessionUser)) return sessionUser;
   const globalUser = window.FLY_SPACE_USER;
   const globalActor = typeof globalUser === 'string'
     ? globalUser
