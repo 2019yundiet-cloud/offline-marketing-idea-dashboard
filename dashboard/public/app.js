@@ -1,5 +1,7 @@
 const form = document.querySelector('#ideaForm');
-const newIdeaButton = document.querySelector('#newIdeaButton');
+const inputModal = document.querySelector('#input');
+const editorTitle = document.querySelector('#editorTitle');
+const editorCloseButton = document.querySelector('#editorCloseButton');
 const saveStatus = document.querySelector('#saveStatus');
 const storageMode = document.querySelector('#storageMode');
 const ideasBody = document.querySelector('#ideasBody');
@@ -33,6 +35,7 @@ const taskModalTitle = document.querySelector('#taskModalTitle');
 const taskModalKicker = document.querySelector('#taskModalKicker');
 const taskModalBody = document.querySelector('#taskModalBody');
 const taskModalEditButton = document.querySelector('#taskModalEditButton');
+const taskModalDeleteButton = document.querySelector('#taskModalDeleteButton');
 const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
 const allScopeCount = document.querySelector('#allScopeCount');
@@ -88,6 +91,10 @@ const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
 const VALID_TABS = ['home', 'tasks', 'timeline', 'progress'];
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
+const TEAMS = [
+  { name: '기획/실행팀', members: ['동원', '상준', '유민'] },
+  { name: '마케팅팀', members: ['보미', '준호'] }
+];
 const STORES = ['머문래', '갤러리문래'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
 const DUE_FILTERS = [
@@ -122,7 +129,8 @@ const state = {
   saveTimer: null,
   pendingRequest: Promise.resolve(),
   lastSavedSignature: '',
-  modalIdeaId: ''
+  modalIdeaId: '',
+  editorMode: 'create'
 };
 
 initialize();
@@ -212,7 +220,14 @@ function bindAutosave() {
     renderSubcategoryOptions(categoryMajorSelect.value, '');
     scheduleSave();
   });
-  newIdeaButton.addEventListener('click', resetForm);
+  if (editorCloseButton) {
+    editorCloseButton.addEventListener('click', closeEditorModal);
+  }
+  if (inputModal) {
+    inputModal.addEventListener('click', (event) => {
+      if (event.target.closest('[data-editor-close]')) closeEditorModal();
+    });
+  }
   for (const button of viewModeButtons) {
     button.addEventListener('click', () => setViewMode(button.dataset.viewMode));
   }
@@ -247,7 +262,7 @@ function bindAutosave() {
     const row = event.target.closest('tr[data-id]');
     if (!row) return;
     const idea = state.ideas.find((item) => item.client_id === row.dataset.id);
-    if (idea) loadIdeaIntoForm(idea);
+    if (idea) openTaskModal(idea);
   });
   ideasBody.addEventListener('keydown', (event) => {
     if (!['Enter', ' '].includes(event.key)) return;
@@ -255,13 +270,13 @@ function bindAutosave() {
     if (!row) return;
     event.preventDefault();
     const idea = state.ideas.find((item) => item.client_id === row.dataset.id);
-    if (idea) loadIdeaIntoForm(idea);
+    if (idea) openTaskModal(idea);
   });
   ideasBoard.addEventListener('click', (event) => {
     const card = event.target.closest('[data-id]');
     if (!card) return;
     const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
-    if (idea) loadIdeaIntoForm(idea);
+    if (idea) openTaskModal(idea);
   });
   ideasBoard.addEventListener('keydown', (event) => {
     if (!['Enter', ' '].includes(event.key)) return;
@@ -269,7 +284,7 @@ function bindAutosave() {
     if (!card) return;
     event.preventDefault();
     const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
-    if (idea) loadIdeaIntoForm(idea);
+    if (idea) openTaskModal(idea);
   });
 }
 
@@ -458,11 +473,11 @@ function resetForm() {
   mediaStatus.textContent = '';
   updateSnapshot(null);
   setSaveState('idle', '대기');
-  form.querySelector('[name="title"]').focus();
 }
 
 function loadIdeaIntoForm(idea) {
   setActiveTab('tasks');
+  state.editorMode = 'edit';
   state.currentClientId = idea.client_id;
   form.elements.title.value = idea.title || '';
   form.elements.work_type.value = normalizeWorkType(idea.work_type);
@@ -486,7 +501,24 @@ function loadIdeaIntoForm(idea) {
   state.lastSavedSignature = JSON.stringify(collectIdea());
   updateSnapshot(idea);
   setSaveState('saved', '불러옴');
-  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  openEditorModal('edit');
+}
+
+function openEditorModal(mode = 'create') {
+  if (!inputModal) return;
+  state.editorMode = mode === 'edit' ? 'edit' : 'create';
+  if (editorTitle) editorTitle.textContent = state.editorMode === 'edit' ? '업무 수정' : '업무 추가';
+  inputModal.hidden = false;
+  inputModal.classList.add('open');
+  document.body.classList.add('modal-open');
+  requestAnimationFrame(() => form.querySelector('[name="title"]')?.focus());
+}
+
+function closeEditorModal() {
+  if (!inputModal) return;
+  inputModal.classList.remove('open');
+  inputModal.hidden = true;
+  document.body.classList.remove('modal-open');
 }
 
 function upsertIdea(idea) {
@@ -624,27 +656,57 @@ function projectSummaryIdeas() {
 function renderMemberTasks() {
   if (!memberTaskGroups) return;
   const ideas = visibleIdeas();
-  const groups = [...USERS, '미지정'].map((owner) => {
-    const items = owner === '미지정'
-      ? ideas.filter((idea) => !String(idea.owner || '').trim())
-      : ideas.filter((idea) => idea.owner === owner);
-    return { owner, items };
+  const assignedOwners = new Set(TEAMS.flatMap((team) => team.members));
+  const unassignedItems = ideas.filter((idea) => !assignedOwners.has(idea.owner));
+  const teamSections = TEAMS.map((team) => {
+    const total = team.members.reduce((sum, member) => sum + ideas.filter((idea) => idea.owner === member).length, 0);
+    return `
+      <section class="member-team-group">
+        <header>
+          <div>
+            <h4>${escapeHtml(team.name)}</h4>
+            <span>${total.toLocaleString('ko-KR')}개 업무</span>
+          </div>
+        </header>
+        <div class="member-task-grid">
+          ${team.members.map((member) => renderMemberColumn(member, ideas.filter((idea) => idea.owner === member))).join('')}
+        </div>
+      </section>
+    `;
   });
 
-  memberTaskGroups.innerHTML = groups.map((group) => `
+  const extraSection = unassignedItems.length ? `
+    <section class="member-team-group">
+      <header>
+        <div>
+          <h4>미지정</h4>
+          <span>${unassignedItems.length.toLocaleString('ko-KR')}개 업무</span>
+        </div>
+      </header>
+      <div class="member-task-grid">
+        ${renderMemberColumn('미지정', unassignedItems)}
+      </div>
+    </section>
+  ` : '';
+
+  memberTaskGroups.innerHTML = [...teamSections, extraSection].join('');
+}
+
+function renderMemberColumn(owner, items) {
+  return `
     <section class="member-task-group">
       <header>
         <div>
-          <h4>${escapeHtml(group.owner)}</h4>
-          <span>${group.items.length.toLocaleString('ko-KR')}개 업무</span>
+          <h5>${escapeHtml(owner)}</h5>
+          <span>${items.length.toLocaleString('ko-KR')}개</span>
         </div>
-        <button type="button" data-owner-new="${escapeHtml(group.owner)}">추가</button>
+        <button type="button" data-owner-new="${escapeHtml(owner)}">추가</button>
       </header>
       <div class="member-task-list">
-        ${group.items.length ? group.items.map(renderMemberTaskCard).join('') : '<p>업무 없음</p>'}
+        ${items.length ? items.map(renderMemberTaskCard).join('') : '<p>업무 없음</p>'}
       </div>
     </section>
-  `).join('');
+  `;
 }
 
 function renderMemberTaskCard(idea) {
@@ -652,7 +714,7 @@ function renderMemberTaskCard(idea) {
     <article class="member-task-card" data-member-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
       <div>
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
-        <span>${escapeHtml([idea.project_name || '프로젝트 미지정', idea.store || '매장 전체'].join(' · '))}</span>
+        <span>${escapeHtml(taskMeta([idea.project_name, idea.store || '매장 전체']))}</span>
       </div>
       <footer>
         <span>${escapeHtml(statusName(idea.status))}</span>
@@ -700,7 +762,11 @@ function groupByProject(ideas) {
 }
 
 function projectLabel(idea) {
-  return String(idea.project_name || '').trim() || '프로젝트 미지정';
+  return String(idea.project_name || '').trim() || '일반 업무';
+}
+
+function taskMeta(values) {
+  return values.map((value) => String(value || '').trim()).filter(Boolean).join(' · ');
 }
 
 function visibleIdeas() {
@@ -860,7 +926,7 @@ function renderTimelineItem(idea) {
     <article class="timeline-item" data-timeline-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
       <div>
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
-        <span>${escapeHtml([idea.owner || '담당자 미정', idea.store || '매장 전체', idea.project_name || '프로젝트 미지정'].join(' · '))}</span>
+        <span>${escapeHtml(taskMeta([idea.owner || '담당자 미정', idea.store || '매장 전체', idea.project_name]))}</span>
       </div>
       <div class="timeline-item-meta">
         <span>${escapeHtml(statusName(idea.status))}</span>
@@ -1030,7 +1096,7 @@ function handleProjectBoardClick(event) {
   const task = event.target.closest('[data-project-task]');
   if (!task) return;
   const idea = state.ideas.find((item) => item.client_id === task.dataset.projectTask);
-  if (idea) loadIdeaIntoForm(idea);
+  if (idea) openTaskModal(idea);
 }
 
 function handleProjectBoardKeydown(event) {
@@ -1039,7 +1105,7 @@ function handleProjectBoardKeydown(event) {
   if (!task) return;
   event.preventDefault();
   const idea = state.ideas.find((item) => item.client_id === task.dataset.projectTask);
-  if (idea) loadIdeaIntoForm(idea);
+  if (idea) openTaskModal(idea);
 }
 
 function handleMemberTaskClick(event) {
@@ -1052,7 +1118,7 @@ function handleMemberTaskClick(event) {
   const card = event.target.closest('[data-member-task]');
   if (!card) return;
   const idea = state.ideas.find((item) => item.client_id === card.dataset.memberTask);
-  if (idea) loadIdeaIntoForm(idea);
+  if (idea) openTaskModal(idea);
 }
 
 function handleMemberTaskKeydown(event) {
@@ -1061,7 +1127,7 @@ function handleMemberTaskKeydown(event) {
   if (!card) return;
   event.preventDefault();
   const idea = state.ideas.find((item) => item.client_id === card.dataset.memberTask);
-  if (idea) loadIdeaIntoForm(idea);
+  if (idea) openTaskModal(idea);
 }
 
 function startNewTaskForOwner(owner) {
@@ -1070,8 +1136,7 @@ function startNewTaskForOwner(owner) {
     form.elements.owner.value = owner;
   }
   setActiveTab('tasks');
-  document.querySelector('#input').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  form.querySelector('[name="title"]').focus();
+  openEditorModal('create');
 }
 
 function handleTimelineClick(event) {
@@ -1095,7 +1160,7 @@ function openTaskModal(idea) {
   state.modalIdeaId = idea.client_id;
   taskModalTitle.textContent = idea.title || '제목 없음';
   if (taskModalKicker) {
-    taskModalKicker.textContent = [idea.store || '매장 전체', idea.project_name || '프로젝트 미지정'].join(' · ');
+    taskModalKicker.textContent = taskMeta([idea.store || '매장 전체', idea.project_name]);
   }
   taskModalBody.innerHTML = renderTaskModalBody(idea);
   taskDetailModal.hidden = false;
@@ -1121,12 +1186,45 @@ function handleTaskModalClick(event) {
     const idea = state.ideas.find((item) => item.client_id === state.modalIdeaId);
     closeTaskModal();
     if (idea) loadIdeaIntoForm(idea);
+    return;
   }
+  if (event.target === taskModalDeleteButton || event.target.closest('#taskModalDeleteButton')) {
+    deleteCurrentModalIdea();
+  }
+}
+
+async function deleteCurrentModalIdea() {
+  const idea = state.ideas.find((item) => item.client_id === state.modalIdeaId);
+  if (!idea) return;
+  const ok = window.confirm(`"${idea.title || '제목 없음'}" 업무를 삭제할까요?`);
+  if (!ok) return;
+  setSaveState('saving', '삭제 중');
+  try {
+    const response = await fetch(`${API_IDEAS_URL}/${encodeURIComponent(idea.client_id)}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('delete_failed');
+    const payload = await response.json();
+    storageMode.textContent = payload.supabaseEnabled ? 'Supabase 연결' : '로컬 저장';
+  } catch {
+    deleteBrowserIdea(idea.client_id);
+    storageMode.textContent = '브라우저 저장';
+  }
+  state.ideas = state.ideas.filter((item) => item.client_id !== idea.client_id);
+  if (state.currentClientId === idea.client_id) {
+    resetForm();
+  }
+  closeTaskModal();
+  updateSnapshot(null);
+  setSaveState('saved', '삭제됨');
+  render();
 }
 
 function handleTaskModalKeydown(event) {
   if (event.key === 'Escape' && taskDetailModal && !taskDetailModal.hidden) {
     closeTaskModal();
+    return;
+  }
+  if (event.key === 'Escape' && inputModal && !inputModal.hidden) {
+    closeEditorModal();
   }
 }
 
@@ -2107,6 +2205,15 @@ function saveBrowserIdea(idea) {
   else ideas.unshift(saved);
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(ideas));
   return saved;
+}
+
+function deleteBrowserIdea(clientId) {
+  try {
+    const ideas = readBrowserIdeas().filter((idea) => idea.client_id !== clientId);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(ideas));
+  } catch {
+    // Deleting from browser storage is best-effort when the API is unavailable.
+  }
 }
 
 function readViewMode() {

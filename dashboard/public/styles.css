@@ -824,6 +824,45 @@ button:hover {
   padding: 24px;
 }
 
+.member-team-list {
+  display: grid;
+  gap: 14px;
+}
+
+.member-team-group {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.member-team-group > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.member-team-group h4,
+.member-team-group h5 {
+  margin: 0;
+}
+
+.member-team-group h4 {
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.member-team-group > header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .member-task-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -846,12 +885,11 @@ button:hover {
   gap: 10px;
 }
 
-.member-task-group h4,
 .member-task-group p {
   margin: 0;
 }
 
-.member-task-group h4 {
+.member-task-group h5 {
   font-size: 17px;
   font-weight: 850;
 }
@@ -1256,7 +1294,13 @@ body.modal-open {
 }
 
 .task-modal-card > footer {
+  align-items: center;
   justify-content: flex-end;
+}
+
+.danger-button {
+  margin-right: auto;
+  color: var(--danger) !important;
 }
 
 .task-modal-body {
@@ -1328,6 +1372,27 @@ body.modal-open {
   border: 1px solid var(--line);
   border-radius: 12px;
   object-fit: cover;
+}
+
+.task-editor-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.task-editor-modal[hidden] {
+  display: none;
+}
+
+.task-editor-modal .entry-form {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 920px);
+  max-height: min(86vh, 820px);
+  overflow: auto;
 }
 
 .form-header,
@@ -2275,10 +2340,21 @@ td small {
     padding: 12px;
   }
 
+  .task-editor-modal {
+    align-items: end;
+    padding: 12px;
+  }
+
   .task-modal-card {
     width: 100%;
     max-height: min(86vh, 760px);
     padding: 18px;
+  }
+
+  .task-editor-modal .entry-form {
+    width: 100%;
+    max-height: min(88vh, 780px);
+    padding: 18px 0;
   }
 
   .task-modal-card > header {

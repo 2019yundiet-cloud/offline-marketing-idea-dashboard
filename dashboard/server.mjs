@@ -73,6 +73,12 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { idea: saved, supabaseEnabled });
     }
 
+    if (url.pathname.startsWith('/api/ideas/') && req.method === 'DELETE') {
+      const clientId = decodeURIComponent(url.pathname.replace('/api/ideas/', '')).trim();
+      const deleted = await deleteIdea(clientId);
+      return sendJson(res, 200, { deleted, supabaseEnabled });
+    }
+
     if (url.pathname === '/api/categories' && req.method === 'POST') {
       const body = await readJsonBody(req);
       const saved = await saveCategory(body);
@@ -186,6 +192,30 @@ async function saveIdea(input) {
   return idea;
 }
 
+async function deleteIdea(clientId) {
+  const id = stringValue(clientId);
+  if (!id) throw new Error('missing_client_id');
+  await deleteLocalIdea(id);
+  const deleted = { client_id: id, remote_status: 'local_only' };
+  if (supabaseEnabled) {
+    try {
+      await deleteSupabaseIdea(id);
+      deleted.remote_status = 'synced';
+    } catch (error) {
+      console.warn(`Supabase delete failed, kept local delete: ${error.message}`);
+      deleted.remote_status = 'local_only';
+      deleted.remote_error = error.message;
+    }
+  }
+  return deleted;
+}
+
+async function deleteLocalIdea(clientId) {
+  const ideas = await readLocalIdeas();
+  const nextIdeas = ideas.filter((item) => item.client_id !== clientId);
+  await fs.writeFile(ideasFile, `${JSON.stringify(nextIdeas.sort(sortIdeas), null, 2)}\n`, 'utf8');
+}
+
 async function saveCategory(input) {
   const now = new Date().toISOString();
   const category = normalizeCategory({ ...input, updated_at: now, created_at: input?.created_at || now });
@@ -297,6 +327,16 @@ async function saveSupabaseIdea(idea) {
       Prefer: 'resolution=merge-duplicates,return=minimal'
     },
     body: JSON.stringify(toSupabaseRow(idea))
+  });
+}
+
+async function deleteSupabaseIdea(clientId) {
+  const endpoint = `${supabaseUrl}/rest/v1/offline_marketing_ideas?client_id=eq.${encodeURIComponent(clientId)}`;
+  await supabaseFetch(endpoint, {
+    method: 'DELETE',
+    headers: {
+      Prefer: 'return=minimal'
+    }
   });
 }
 

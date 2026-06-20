@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>Fly Space</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260620-teamtimeline">
+    <link rel="stylesheet" href="styles.css?v=20260620-teammodal">
   </head>
   <body>
     <div class="app-shell">
@@ -103,7 +103,7 @@
               <span>팀원 이름 아래에서 업무를 추가하고 확인합니다.</span>
             </div>
           </div>
-          <div id="memberTaskGroups" class="member-task-grid"></div>
+          <div id="memberTaskGroups" class="member-team-list"></div>
         </section>
 
         <section class="task-filter-bar" aria-label="업무 필터">
@@ -182,15 +182,16 @@
           <div id="ideasBoard" class="board-view" hidden></div>
         </section>
 
-        <section id="input" class="input-layout">
+        <section id="input" class="input-layout task-editor-modal" hidden>
+          <button type="button" class="task-modal-backdrop" data-editor-close aria-label="편집 닫기"></button>
           <form id="ideaForm" class="entry-form" autocomplete="off">
             <div class="form-header">
               <div>
                 <p class="section-mode">쓰기</p>
-                <h3>업무 작성</h3>
+                <h3 id="editorTitle">업무 작성</h3>
                 <p id="formScopeNote" class="form-scope-note">전체 업무</p>
               </div>
-              <button type="button" id="newIdeaButton">새 업무</button>
+              <button type="button" id="editorCloseButton">닫기</button>
             </div>
 
             <div class="form-grid">
@@ -366,11 +367,12 @@
           </header>
           <div id="taskModalBody" class="task-modal-body"></div>
           <footer>
+            <button type="button" id="taskModalDeleteButton" class="danger-button">삭제</button>
             <button type="button" id="taskModalEditButton">수정하기</button>
           </footer>
         </section>
       </div>
     </div>
-    <script src="app.js?v=20260620-teamtimeline" type="module"></script>
+    <script src="app.js?v=20260620-teammodal" type="module"></script>
   </body>
 </html>
