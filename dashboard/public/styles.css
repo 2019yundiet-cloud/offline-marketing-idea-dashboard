@@ -15,6 +15,9 @@
   --danger: #9b1c1c;
   --ok: #1f5f3a;
   --shadow: none;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
 }
 
 * {
@@ -40,7 +43,7 @@ textarea {
 
 button {
   border: 1px solid var(--line-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: #fff;
   color: var(--text);
   min-height: 44px;
@@ -82,6 +85,7 @@ button:hover {
   width: 44px;
   height: 44px;
   border: 1px solid var(--line-strong);
+  border-radius: 14px;
 }
 
 .brand-mark img {
@@ -118,6 +122,7 @@ button:hover {
   min-height: 44px;
   margin-top: 18px;
   border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   color: var(--text);
   font-size: 13px;
   font-weight: 800;
@@ -186,6 +191,7 @@ button:hover {
   color: #fff;
   margin: 0 -8px;
   padding: 0 8px;
+  border-radius: var(--radius-sm);
 }
 
 .category-tree {
@@ -341,15 +347,17 @@ button:hover {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
-  border-top: 1px solid var(--line-strong);
-  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
 }
 
 .stage-tabs {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
 }
 
 .stage-tabs button {
@@ -389,6 +397,7 @@ button:hover {
   display: grid;
   gap: 14px;
   border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
   padding: 18px;
   background: #fff;
 }
@@ -446,7 +455,7 @@ button:hover {
 }
 
 .quick-search input {
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .filter-lanes {
@@ -474,7 +483,7 @@ button:hover {
   gap: 7px;
   min-height: 44px;
   border-color: var(--line);
-  border-radius: 8px;
+  border-radius: 999px;
   padding: 0 12px;
   color: var(--text);
   white-space: nowrap;
@@ -493,12 +502,204 @@ button:hover {
   opacity: 0.72;
 }
 
+.store-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.store-room-card {
+  display: grid;
+  gap: 14px;
+  min-height: 174px;
+  border-color: var(--line);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  text-align: left;
+}
+
+.store-room-card:hover,
+.store-room-card.active {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.store-room-card.active .store-room-meta,
+.store-room-card.active .store-room-stages,
+.store-room-card:hover .store-room-meta,
+.store-room-card:hover .store-room-stages {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.store-room-name {
+  color: inherit;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.store-room-card > strong {
+  font-size: clamp(34px, 6vw, 54px);
+  font-weight: 520;
+  line-height: 0.98;
+}
+
+.store-room-meta,
+.store-room-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.store-room-meta b,
+.store-room-stages em {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.project-group-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.project-group-card,
+.project-empty {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+
+.project-group-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.project-group-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-group-card header span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.project-group-card h4 {
+  margin: 5px 0 0;
+  font-size: 19px;
+  font-weight: 720;
+  line-height: 1.32;
+}
+
+.project-group-card header button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  border-color: var(--line);
+  border-radius: 999px;
+  padding: 0 13px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.project-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.project-status-row span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 9px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.project-status-row b {
+  margin-left: 5px;
+  color: var(--text);
+}
+
+.project-task-list {
+  display: grid;
+  gap: 8px;
+}
+
+.project-task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 11px 12px;
+  cursor: pointer;
+}
+
+.project-task:hover,
+.project-task:focus-visible {
+  border-color: #111;
+  outline: none;
+}
+
+.project-task strong,
+.project-task span {
+  display: block;
+}
+
+.project-task strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.project-task span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.project-empty {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  padding: 26px;
+  color: var(--muted);
+}
+
+.project-empty strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
 .metric,
 .entry-form,
 .side-panel,
-.records-section {
+.records-section,
+.store-war-room,
+.project-board-section {
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -537,7 +738,9 @@ button:hover {
 
 .entry-form,
 .side-panel,
-.records-section {
+.records-section,
+.store-war-room,
+.project-board-section {
   min-width: 0;
   padding: 24px;
 }
@@ -569,13 +772,13 @@ button:hover {
   gap: 6px;
   padding: 4px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .records-tools button {
   min-height: 36px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 0 12px;
   color: var(--muted);
   font-size: 13px;
@@ -664,6 +867,7 @@ label span,
   place-items: center;
   min-height: 118px;
   border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   color: var(--text);
   font-size: 14px;
   font-weight: 800;
@@ -686,6 +890,8 @@ label span,
   min-width: 0;
   margin: 0;
   border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .photo-card img {
@@ -777,7 +983,7 @@ select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: #fff;
   color: var(--text);
   min-height: 44px;
@@ -900,6 +1106,7 @@ td small {
   align-items: center;
   min-height: 24px;
   border: 1px solid var(--line);
+  border-radius: 999px;
   padding: 0 7px;
   font-size: 11px;
   font-style: normal;
@@ -971,6 +1178,7 @@ td small {
   align-items: center;
   min-height: 26px;
   border: 1px solid var(--line);
+  border-radius: 999px;
   padding: 0 8px;
   color: var(--muted);
   font-size: 12px;
@@ -986,6 +1194,7 @@ td small {
   align-items: center;
   min-height: 26px;
   border: 1px solid var(--line);
+  border-radius: 999px;
   padding: 0 8px;
   color: var(--muted);
   font-size: 12px;
@@ -1026,6 +1235,8 @@ td small {
 .board-column {
   min-width: 190px;
   border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
   background: #fff;
 }
 
@@ -1053,6 +1264,7 @@ td small {
   gap: 9px;
   min-height: 44px;
   border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   padding: 12px;
   cursor: pointer;
 }
@@ -1108,6 +1320,7 @@ td small {
 .board-empty {
   grid-column: 1 / -1;
   border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
   padding: 28px;
 }
 
@@ -1117,7 +1330,7 @@ td small {
   justify-content: center;
   min-height: 26px;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 999px;
   padding: 0 9px;
   background: #fff;
   color: var(--muted);
@@ -1205,7 +1418,9 @@ td small {
   }
 
   .input-layout,
-  .metric-grid {
+  .metric-grid,
+  .store-card-grid,
+  .project-group-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1361,13 +1576,25 @@ td small {
 
   .entry-form,
   .side-panel,
-  .records-section {
+  .records-section,
+  .store-war-room,
+  .project-board-section {
     padding: 18px 0;
     border-right: 0;
     border-left: 0;
   }
 
   .form-header {
+    padding: 0 16px;
+  }
+
+  .store-war-room .section-heading,
+  .project-board-section .section-heading {
+    padding: 0 16px;
+  }
+
+  .store-card-grid,
+  .project-group-grid {
     padding: 0 16px;
   }
 

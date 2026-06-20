@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>오프라인 마케팅 아이디어 대시보드</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260619-options">
+    <link rel="stylesheet" href="styles.css?v=20260620-warroom">
   </head>
   <body>
     <div class="app-shell">
@@ -15,7 +15,7 @@
           <span class="brand-mark"><img src="financier.svg" alt=""></span>
           <div>
             <h1>기획안 관리</h1>
-            <p>카테고리 · 프로젝트 · 매장</p>
+            <p>매장 · 프로젝트 · 업무</p>
           </div>
         </div>
         <a class="design-lab-link" href="designs/index.html" target="_blank" rel="noreferrer">디자인 시안 10개 보기</a>
@@ -39,6 +39,17 @@
             <span id="saveStatus" class="status-pill idle">대기</span>
           </div>
         </header>
+
+        <section id="storeWarRoom" class="store-war-room" aria-label="매장 워룸">
+          <div class="section-heading">
+            <div>
+              <p class="section-mode">매장 선택</p>
+              <h3>매장 워룸</h3>
+              <span>매장을 클릭하면 해당 매장 안에서 프로젝트별 업무가 정리됩니다.</span>
+            </div>
+          </div>
+          <div id="storeCards" class="store-card-grid"></div>
+        </section>
 
         <section id="overview" class="metric-grid" aria-label="아이디어 요약">
           <article class="metric">
@@ -130,10 +141,21 @@
           </div>
         </section>
 
+        <section id="projectBoard" class="project-board-section" aria-label="프로젝트별 업무">
+          <div class="section-heading">
+            <div>
+              <p class="section-mode">프로젝트 관리</p>
+              <h3>프로젝트별 업무</h3>
+              <span id="projectBoardSummary">매장을 선택하면 프로젝트 단위로 업무가 묶입니다.</span>
+            </div>
+          </div>
+          <div id="projectGroups" class="project-group-grid"></div>
+        </section>
+
         <section id="records" class="records-section">
           <div class="section-heading">
             <div>
-              <h3>기획안 목록</h3>
+              <h3>업무 상세 목록</h3>
               <span id="recordCount">0개</span>
             </div>
             <div class="records-tools" aria-label="보기 방식">
@@ -291,6 +313,6 @@
         </section>
       </main>
     </div>
-    <script src="app.js?v=20260619-options" type="module"></script>
+    <script src="app.js?v=20260620-warroom" type="module"></script>
   </body>
 </html>

@@ -11,6 +11,10 @@ const viewModeButtons = document.querySelectorAll('[data-view-mode]');
 const quickFilters = document.querySelector('#quickFilters');
 const projectSearch = document.querySelector('#projectSearch');
 const clearFiltersButton = document.querySelector('#clearFiltersButton');
+const storeWarRoom = document.querySelector('#storeWarRoom');
+const storeCards = document.querySelector('#storeCards');
+const projectGroups = document.querySelector('#projectGroups');
+const projectBoardSummary = document.querySelector('#projectBoardSummary');
 const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
 const allScopeCount = document.querySelector('#allScopeCount');
@@ -128,6 +132,9 @@ function bindAutosave() {
     render();
   });
   clearFiltersButton.addEventListener('click', clearQuickFilters);
+  storeWarRoom.addEventListener('click', handleStoreWarRoomClick);
+  projectGroups.addEventListener('click', handleProjectBoardClick);
+  projectGroups.addEventListener('keydown', handleProjectBoardKeydown);
   categoryTree.addEventListener('click', handleScopeClick);
   if (allScopeButton) {
     allScopeButton.addEventListener('click', () => setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' }));
@@ -350,10 +357,12 @@ function upsertIdea(idea) {
 function render() {
   renderScopeHeader();
   updateScopeControlledFields();
+  renderStoreWarRoom();
   renderQuickFilters();
   renderCategoryTree();
   renderMetrics();
   renderStageTabs();
+  renderProjectGroups();
   renderRecords();
 }
 
@@ -382,6 +391,118 @@ function renderStageTabs() {
     button.classList.toggle('active', stage === state.selectedStage);
     button.querySelector('strong').textContent = (counts[stage] || 0).toLocaleString('ko-KR');
   }
+}
+
+function renderStoreWarRoom() {
+  storeCards.innerHTML = STORES.map((store) => {
+    const summary = storeSummary(store);
+    const scope = { kind: 'store', major: '', subcategory: '', store };
+    const active = scopeActive(scope);
+    return `
+      <button type="button" class="store-room-card ${active ? 'active' : ''}" data-store-room="${escapeHtml(store)}">
+        <span class="store-room-name">${escapeHtml(store)}</span>
+        <strong>${summary.total.toLocaleString('ko-KR')}</strong>
+        <span class="store-room-meta">
+          <b>프로젝트 ${summary.projects.toLocaleString('ko-KR')}</b>
+          <b>지연 ${summary.overdue.toLocaleString('ko-KR')}</b>
+        </span>
+        <span class="store-room-stages">
+          ${Object.entries(labels.status).map(([status, label]) => `<em>${escapeHtml(label)} ${summary.statuses[status] || 0}</em>`).join('')}
+        </span>
+      </button>
+    `;
+  }).join('');
+}
+
+function storeSummary(store) {
+  const filters = { ...state.filters, store: 'all' };
+  const ideas = state.ideas.filter((idea) => idea.store === store && matchesQuickFilters(idea, filters));
+  const projects = new Set(ideas.map(projectLabel)).size;
+  const statuses = ideas.reduce((acc, idea) => {
+    const status = normalizeStatus(idea.status);
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+  const overdue = ideas.filter((idea) => matchesDueFilter(idea, 'overdue')).length;
+  return { total: ideas.length, projects, overdue, statuses };
+}
+
+function renderProjectGroups() {
+  const ideas = visibleIdeas();
+  const groups = groupByProject(ideas);
+  const selectedStore = normalizeScope(state.selectedScope).store;
+  projectBoardSummary.textContent = selectedStore
+    ? `${selectedStore} 매장의 프로젝트 ${groups.length.toLocaleString('ko-KR')}개`
+    : `전체 매장의 프로젝트 ${groups.length.toLocaleString('ko-KR')}개`;
+
+  if (!groups.length) {
+    projectGroups.innerHTML = `
+      <div class="project-empty">
+        <strong>아직 프로젝트 업무가 없습니다.</strong>
+        <span>매장을 선택하고 아래 작성 영역에서 프로젝트명과 업무를 입력하면 이곳에 자동으로 묶입니다.</span>
+      </div>
+    `;
+    return;
+  }
+
+  projectGroups.innerHTML = groups.map((group) => `
+    <article class="project-group-card">
+      <header>
+        <div>
+          <span>${escapeHtml(group.storeLabel)}</span>
+          <h4>${escapeHtml(group.project)}</h4>
+        </div>
+        <button type="button" data-project-name="${escapeHtml(group.project)}">보기</button>
+      </header>
+      <div class="project-status-row">
+        ${Object.entries(labels.status).map(([status, label]) => `<span>${escapeHtml(label)} <b>${group.statuses[status] || 0}</b></span>`).join('')}
+      </div>
+      <div class="project-task-list">
+        ${group.ideas.slice(0, 4).map(renderProjectTask).join('')}
+      </div>
+    </article>
+  `).join('');
+}
+
+function renderProjectTask(idea) {
+  return `
+    <article class="project-task" data-project-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
+      <div>
+        <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
+        <span>${escapeHtml([idea.owner || '담당자 미정', idea.store || '매장 전체', statusName(idea.status)].join(' · '))}</span>
+      </div>
+      ${renderDueBadge(idea)}
+    </article>
+  `;
+}
+
+function groupByProject(ideas) {
+  const groups = new Map();
+  for (const idea of ideas) {
+    const project = projectLabel(idea);
+    const key = `${project}|${idea.store || '전체'}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        project,
+        storeLabel: idea.store || '전체 매장',
+        ideas: [],
+        statuses: {}
+      });
+    }
+    const group = groups.get(key);
+    group.ideas.push(idea);
+    const status = normalizeStatus(idea.status);
+    group.statuses[status] = (group.statuses[status] || 0) + 1;
+  }
+  return [...groups.values()].sort((a, b) => {
+    const newestA = a.ideas[0]?.updated_at || a.ideas[0]?.created_at || '';
+    const newestB = b.ideas[0]?.updated_at || b.ideas[0]?.created_at || '';
+    return newestB.localeCompare(newestA) || a.project.localeCompare(b.project, 'ko-KR');
+  });
+}
+
+function projectLabel(idea) {
+  return String(idea.project_name || '').trim() || '프로젝트 미지정';
 }
 
 function visibleIdeas() {
@@ -522,6 +643,39 @@ function renderTags(tags) {
   const values = selectedTags({ tags });
   if (!values.length) return '';
   return `<span class="tag-line">${values.map((tag) => `<em>${escapeHtml(tag)}</em>`).join('')}</span>`;
+}
+
+function handleStoreWarRoomClick(event) {
+  const button = event.target.closest('[data-store-room]');
+  if (!button) return;
+  state.filters.store = 'all';
+  setSelectedScope({ kind: 'store', major: '', subcategory: '', store: button.dataset.storeRoom || '' });
+  document.querySelector('#projectBoard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function handleProjectBoardClick(event) {
+  const projectButton = event.target.closest('[data-project-name]');
+  if (projectButton) {
+    state.filters.query = projectButton.dataset.projectName || '';
+    projectSearch.value = state.filters.query;
+    render();
+    document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+
+  const task = event.target.closest('[data-project-task]');
+  if (!task) return;
+  const idea = state.ideas.find((item) => item.client_id === task.dataset.projectTask);
+  if (idea) loadIdeaIntoForm(idea);
+}
+
+function handleProjectBoardKeydown(event) {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const task = event.target.closest('[data-project-task]');
+  if (!task) return;
+  event.preventDefault();
+  const idea = state.ideas.find((item) => item.client_id === task.dataset.projectTask);
+  if (idea) loadIdeaIntoForm(idea);
 }
 
 function handleQuickFilterClick(event) {
@@ -910,8 +1064,8 @@ function scopeHeading(scope) {
   const normalized = normalizeScope(scope);
   if (normalized.kind === 'store') {
     return {
-      title: `${normalized.store} 보드`,
-      context: [normalized.major, normalized.subcategory].filter(Boolean).join(' / ')
+      title: `${normalized.store} 워룸`,
+      context: [normalized.major, normalized.subcategory].filter(Boolean).join(' / ') || '매장별 프로젝트 관리'
     };
   }
   if (normalized.kind === 'subcategory') {
