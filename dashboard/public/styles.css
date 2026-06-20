@@ -1457,6 +1457,31 @@ body.modal-open {
   color: #fff;
 }
 
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.form-footer .primary-action {
+  min-width: 144px;
+  min-height: 48px;
+  border-color: #111;
+  border-radius: 14px;
+  background: #111;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.form-footer .primary-action:hover,
+.form-footer .primary-action:focus-visible {
+  background: #111;
+  color: #fff;
+}
+
 .section-heading > div {
   min-width: 0;
 }
@@ -2483,6 +2508,14 @@ td small {
 
   .form-grid {
     padding: 0 16px;
+  }
+
+  .form-footer {
+    padding: 16px 16px 0;
+  }
+
+  .form-footer .primary-action {
+    width: 100%;
   }
 
   .side-panel {

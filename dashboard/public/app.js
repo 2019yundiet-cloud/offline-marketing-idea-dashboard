@@ -45,6 +45,7 @@ const activeScopePath = document.querySelector('#activeScopePath');
 const formScopeNote = document.querySelector('#formScopeNote');
 const categoryMajorSelect = document.querySelector('#categoryMajorSelect');
 const categorySubSelect = document.querySelector('#categorySubSelect');
+const workTypeChoices = document.querySelector('#workTypeChoices');
 const categoryMajorChoices = document.querySelector('#categoryMajorChoices');
 const categorySubChoices = document.querySelector('#categorySubChoices');
 const storeChoices = document.querySelector('#storeChoices');
@@ -312,6 +313,11 @@ function bindAutosave() {
 }
 
 function bindChoiceControls() {
+  bindChoiceGroup(workTypeChoices, (value) => {
+    form.elements.work_type.value = normalizeWorkType(value);
+    renderChoiceControls();
+    scheduleSave();
+  });
   bindChoiceGroup(categoryMajorChoices, (value) => {
     form.elements.category_major.value = value;
     renderSubcategoryOptions(value, '');
@@ -1032,11 +1038,13 @@ function compareTimelineItems(a, b) {
 
 function renderTimelineItem(idea) {
   const timelineState = timelineGroupState(normalizeDateInput(idea.due_date || idea.payload?.due_date || '') || 'none');
+  const team = teamNameForOwner(idea.owner);
+  const part = timelinePartLabel(idea);
   return `
     <article class="timeline-item timeline-${escapeHtml(timelineState)}" data-timeline-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
       <div>
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
-        <span>${escapeHtml(taskMeta([idea.owner || '담당자 미정', idea.store || '매장 전체', idea.project_name]))}</span>
+        <span>${escapeHtml(taskMeta([idea.owner || '담당자 미정', team, part, idea.store || '매장 전체', idea.project_name]))}</span>
       </div>
       <div class="timeline-item-meta">
         <span>${escapeHtml(statusName(idea.status))}</span>
@@ -1168,6 +1176,10 @@ function updateSnapshot(idea) {
 }
 
 function setSaveState(kind, label) {
+  if (!saveStatus) return;
+  const shouldHide = kind === 'idle' && label === '대기';
+  saveStatus.hidden = shouldHide;
+  if (shouldHide) return;
   saveStatus.className = `status-pill ${kind}`;
   saveStatus.textContent = label;
 }
@@ -1742,6 +1754,7 @@ function renderSubcategoryOptions(majorName, selectedSubcategory = form.elements
 }
 
 function renderChoiceControls() {
+  renderChoiceButtonGroup(workTypeChoices, WORK_TYPES, normalizeWorkType(form.elements.work_type?.value || '아이디어'));
   renderChoiceButtonGroup(categoryMajorChoices, majorCategories().map((category) => category.name), form.elements.category_major?.value || '');
 
   const selectedMajor = form.elements.category_major?.value || '';
@@ -1900,6 +1913,15 @@ function renderCategoryCell(idea) {
 function normalizeWorkType(value) {
   const candidate = String(value || '').trim();
   return WORK_TYPES.includes(candidate) ? candidate : '아이디어';
+}
+
+function teamNameForOwner(owner) {
+  const team = TEAMS.find((item) => item.members.includes(owner));
+  return team?.name || '';
+}
+
+function timelinePartLabel(idea) {
+  return taskMeta([idea.category_major, idea.category_sub]) || normalizeWorkType(idea.work_type);
 }
 
 function currentActor() {

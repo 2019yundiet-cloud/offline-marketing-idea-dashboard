@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>Fly Space</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260620-cleanworklog">
+    <link rel="stylesheet" href="styles.css?v=20260620-worktypebottomsave">
   </head>
   <body>
     <div class="app-shell">
@@ -36,7 +36,7 @@
           </div>
           <div class="status-strip" aria-live="polite">
             <span id="storageMode">확인 중</span>
-            <span id="saveStatus" class="status-pill idle">대기</span>
+            <span id="saveStatus" class="status-pill idle" hidden></span>
           </div>
         </header>
 
@@ -116,7 +116,6 @@
                 <p id="formScopeNote" class="form-scope-note">전체 업무</p>
               </div>
               <div class="editor-actions">
-                <button type="button" id="editorSaveButton" class="primary-action">저장</button>
                 <button type="button" id="editorCloseButton">닫기</button>
               </div>
             </div>
@@ -126,15 +125,16 @@
                 <span>기획/아이디어 제목</span>
                 <input name="title" type="text" placeholder="예: 머문래 점심시간 샘플링 이벤트">
               </label>
-              <label>
+              <div class="form-control choice-backed-field">
                 <span>작업 구분</span>
-                <select name="work_type">
+                <select name="work_type" hidden>
                   <option value="아이디어">아이디어</option>
                   <option value="기획안">기획안</option>
                   <option value="프로젝트">프로젝트</option>
                   <option value="업무">업무</option>
                 </select>
-              </label>
+                <div id="workTypeChoices" class="choice-grid" aria-label="작업 구분 선택"></div>
+              </div>
               <label>
                 <span>프로젝트명</span>
                 <input name="project_name" type="text" placeholder="예: 7월 매장 유입 캠페인">
@@ -242,6 +242,9 @@
                 <p id="mediaStatus" class="media-status" aria-live="polite"></p>
               </fieldset>
             </div>
+            <div class="form-footer">
+              <button type="button" id="editorSaveButton" class="primary-action">저장</button>
+            </div>
           </form>
         </section>
         </section>
@@ -308,6 +311,6 @@
         </section>
       </div>
     </div>
-    <script src="app.js?v=20260620-cleanworklog" type="module"></script>
+    <script src="app.js?v=20260620-worktypebottomsave" type="module"></script>
   </body>
 </html>
