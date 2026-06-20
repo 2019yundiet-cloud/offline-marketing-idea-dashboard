@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>Fly Space</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260620-modalchoices">
+    <link rel="stylesheet" href="styles.css?v=20260620-cleanworklog">
   </head>
   <body>
     <div class="app-shell">
@@ -106,82 +106,6 @@
           <div id="memberTaskGroups" class="member-team-list"></div>
         </section>
 
-        <section class="task-filter-bar" aria-label="업무 필터">
-          <label class="task-filter-wide">
-            <span>프로젝트 검색</span>
-            <input id="projectSearch" type="search" placeholder="프로젝트명, 제목, 내용">
-          </label>
-          <label>
-            <span>상태</span>
-            <select id="taskStatusFilter">
-              <option value="all">전체</option>
-              <option value="idea">아이디어</option>
-              <option value="discussion">논의</option>
-              <option value="planning">상세기획</option>
-              <option value="progress">진행</option>
-              <option value="done">완료</option>
-            </select>
-          </label>
-          <label>
-            <span>담당자</span>
-            <select id="taskOwnerFilter">
-              <option value="all">전체</option>
-            </select>
-          </label>
-          <label>
-            <span>매장</span>
-            <select id="taskStoreFilter">
-              <option value="all">전체</option>
-            </select>
-          </label>
-          <label>
-            <span>구분</span>
-            <select id="taskWorkTypeFilter">
-              <option value="all">전체</option>
-            </select>
-          </label>
-          <label>
-            <span>기한</span>
-            <select id="taskDueFilter">
-              <option value="all">전체</option>
-            </select>
-          </label>
-          <button type="button" id="clearFiltersButton">초기화</button>
-        </section>
-
-        <section id="records" class="records-section">
-          <div class="section-heading">
-            <div>
-              <h3>업무 상세 목록</h3>
-              <span id="recordCount">0개</span>
-            </div>
-            <div class="records-tools" aria-label="보기 방식">
-              <button type="button" data-view-mode="list" class="active">목록</button>
-              <button type="button" data-view-mode="board">보드</button>
-            </div>
-          </div>
-          <div class="table-wrap" id="ideasTableWrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>제목</th>
-                  <th>카테고리</th>
-                  <th>매장</th>
-                  <th>담당자</th>
-                  <th>상태</th>
-                  <th>우선순위</th>
-                  <th>기한</th>
-                  <th>유형</th>
-                  <th>첨부</th>
-                  <th>수정일</th>
-                </tr>
-              </thead>
-              <tbody id="ideasBody"></tbody>
-            </table>
-          </div>
-          <div id="ideasBoard" class="board-view" hidden></div>
-        </section>
-
         <section id="input" class="input-layout task-editor-modal" hidden>
           <button type="button" class="task-modal-backdrop" data-editor-close aria-label="편집 닫기"></button>
           <form id="ideaForm" class="entry-form" autocomplete="off">
@@ -272,6 +196,10 @@
               <label>
                 <span>기한</span>
                 <input name="due_date" type="date">
+              </label>
+              <label>
+                <span>예산</span>
+                <input name="budget" type="text" inputmode="numeric" placeholder="예: 300,000원">
               </label>
               <label hidden>
                 <span>유형</span>
@@ -380,6 +308,6 @@
         </section>
       </div>
     </div>
-    <script src="app.js?v=20260620-modalchoices" type="module"></script>
+    <script src="app.js?v=20260620-cleanworklog" type="module"></script>
   </body>
 </html>

@@ -1016,6 +1016,23 @@ button:hover {
   overflow: hidden;
 }
 
+.timeline-group.timeline-past {
+  opacity: 0.48;
+}
+
+.timeline-group.timeline-past:hover,
+.timeline-group.timeline-past:focus-within {
+  opacity: 0.72;
+}
+
+.timeline-group.timeline-today {
+  border-color: #111;
+}
+
+.timeline-group.timeline-today > header {
+  background: #fafafa;
+}
+
 .timeline-group > header {
   display: flex;
   align-items: center;
@@ -1067,6 +1084,10 @@ button:hover {
   border-bottom: 1px solid var(--line);
   padding: 14px 16px;
   cursor: pointer;
+}
+
+.timeline-item.timeline-past {
+  opacity: 0.56;
 }
 
 .timeline-item:last-child {

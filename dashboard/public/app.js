@@ -91,6 +91,8 @@ const LOCAL_STORAGE_KEY = 'offline-marketing-ideas:v1';
 const CATEGORY_STORAGE_KEY = 'offline-marketing-categories:v1';
 const CATEGORY_COLLAPSE_STORAGE_KEY = 'offline-marketing-category-collapse:v1';
 const VIEW_MODE_STORAGE_KEY = 'offline-marketing-view-mode:v1';
+const ACTOR_STORAGE_KEY = 'fly-space-current-actor:v1';
+const ACTIVITY_STORAGE_KEY = 'fly-space-activity-log:v1';
 const MAX_PHOTOS = 4;
 const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
@@ -135,7 +137,8 @@ const state = {
   pendingRequest: Promise.resolve(),
   lastSavedSignature: '',
   modalIdeaId: '',
-  editorMode: 'create'
+  editorMode: 'create',
+  currentHistory: []
 };
 
 initialize();
@@ -158,6 +161,7 @@ function setActiveTab(tab) {
     window.location.hash = nextTab;
   }
   renderAppTabs();
+  if (nextTab === 'timeline') queueTimelineLanding();
 }
 
 function renderAppTabs() {
@@ -180,6 +184,7 @@ async function initialize() {
   populateTaskFilters();
   renderCategorySelects();
   render();
+  if (state.activeTab === 'timeline') queueTimelineLanding();
   setSaveState('idle', '대기');
 }
 
@@ -216,6 +221,7 @@ function bindAutosave() {
   window.addEventListener('hashchange', () => {
     state.activeTab = readActiveTab();
     renderAppTabs();
+    if (state.activeTab === 'timeline') queueTimelineLanding();
   });
   bindTaskFilterControls();
   storeWarRoom.addEventListener('click', handleStoreWarRoomClick);
@@ -252,7 +258,7 @@ function bindAutosave() {
       syncTaskFilterControls();
       render();
       setActiveTab('tasks');
-      document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollTaskWorkspace();
     });
   }
   if (timelineGroups) {
@@ -270,35 +276,39 @@ function bindAutosave() {
     taskDetailModal.addEventListener('click', handleTaskModalClick);
     document.addEventListener('keydown', handleTaskModalKeydown);
   }
-  ideasBody.addEventListener('click', (event) => {
-    if (event.target.closest('a, button, input, textarea, select')) return;
-    const row = event.target.closest('tr[data-id]');
-    if (!row) return;
-    const idea = state.ideas.find((item) => item.client_id === row.dataset.id);
-    if (idea) openTaskModal(idea);
-  });
-  ideasBody.addEventListener('keydown', (event) => {
-    if (!['Enter', ' '].includes(event.key)) return;
-    const row = event.target.closest('tr[data-id]');
-    if (!row) return;
-    event.preventDefault();
-    const idea = state.ideas.find((item) => item.client_id === row.dataset.id);
-    if (idea) openTaskModal(idea);
-  });
-  ideasBoard.addEventListener('click', (event) => {
-    const card = event.target.closest('[data-id]');
-    if (!card) return;
-    const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
-    if (idea) openTaskModal(idea);
-  });
-  ideasBoard.addEventListener('keydown', (event) => {
-    if (!['Enter', ' '].includes(event.key)) return;
-    const card = event.target.closest('[data-id]');
-    if (!card) return;
-    event.preventDefault();
-    const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
-    if (idea) openTaskModal(idea);
-  });
+  if (ideasBody) {
+    ideasBody.addEventListener('click', (event) => {
+      if (event.target.closest('a, button, input, textarea, select')) return;
+      const row = event.target.closest('tr[data-id]');
+      if (!row) return;
+      const idea = state.ideas.find((item) => item.client_id === row.dataset.id);
+      if (idea) openTaskModal(idea);
+    });
+    ideasBody.addEventListener('keydown', (event) => {
+      if (!['Enter', ' '].includes(event.key)) return;
+      const row = event.target.closest('tr[data-id]');
+      if (!row) return;
+      event.preventDefault();
+      const idea = state.ideas.find((item) => item.client_id === row.dataset.id);
+      if (idea) openTaskModal(idea);
+    });
+  }
+  if (ideasBoard) {
+    ideasBoard.addEventListener('click', (event) => {
+      const card = event.target.closest('[data-id]');
+      if (!card) return;
+      const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
+      if (idea) openTaskModal(idea);
+    });
+    ideasBoard.addEventListener('keydown', (event) => {
+      if (!['Enter', ' '].includes(event.key)) return;
+      const card = event.target.closest('[data-id]');
+      if (!card) return;
+      event.preventDefault();
+      const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
+      if (idea) openTaskModal(idea);
+    });
+  }
 }
 
 function bindChoiceControls() {
@@ -425,22 +435,26 @@ function scheduleSave() {
 }
 
 async function saveCurrentIdea() {
-  const idea = collectIdea();
-  if (!hasMeaningfulInput(idea)) return;
-  const signature = JSON.stringify(idea);
+  const draft = collectIdea();
+  if (!hasMeaningfulInput(draft)) return;
+  const signature = JSON.stringify(draft);
   if (signature === state.lastSavedSignature) {
     setSaveState('saved', '저장됨');
     return;
   }
+  const action = state.ideas.some((item) => item.client_id === draft.client_id) ? '수정' : '생성';
+  const idea = withActionMetadata(draft, action);
+  const body = JSON.stringify(idea);
   try {
     const response = await fetch(API_IDEAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: signature
+      body
     });
     if (!response.ok) throw new Error('save_failed');
     const payload = await response.json();
     const saved = payload.idea;
+    state.currentHistory = normalizeHistory(saved);
     state.lastSavedSignature = JSON.stringify(collectIdea());
     upsertIdea(saved);
     updateSnapshot(saved);
@@ -449,6 +463,7 @@ async function saveCurrentIdea() {
     render();
   } catch {
     const saved = saveBrowserIdea(idea);
+    state.currentHistory = normalizeHistory(saved);
     state.lastSavedSignature = JSON.stringify(collectIdea());
     upsertIdea(saved);
     updateSnapshot(saved);
@@ -468,10 +483,12 @@ function collectIdea() {
   const status = normalizeStatus(values.status?.value || data.get('status') || 'idea');
   const priority = values.priority?.value || data.get('priority') || 'medium';
   const ideaType = values.idea_type?.value || data.get('idea_type') || '';
+  const budget = normalizeBudget(data.get('budget') || '');
   raw.owner = owner;
   raw.status = status;
   raw.priority = priority;
   raw.idea_type = ideaType;
+  raw.budget = budget;
   return {
     client_id: state.currentClientId,
     title: data.get('title') || '',
@@ -484,6 +501,7 @@ function collectIdea() {
     status,
     priority,
     due_date: normalizeDateInput(data.get('due_date') || ''),
+    budget,
     idea_type: ideaType,
     description: data.get('description') || '',
     expected_impact: data.get('expected_impact') || '',
@@ -494,7 +512,10 @@ function collectIdea() {
     payload: {
       raw,
       links,
-      attachments
+      attachments,
+      budget,
+      updated_by: latestHistoryActor(state.currentHistory),
+      history: normalizeHistory(state.currentHistory)
     }
   };
 }
@@ -506,6 +527,7 @@ function hasMeaningfulInput(idea) {
     idea.store ||
     idea.owner ||
     idea.due_date ||
+    idea.budget ||
     idea.idea_type ||
     idea.description ||
     idea.expected_impact ||
@@ -519,6 +541,7 @@ function hasMeaningfulInput(idea) {
 function resetForm() {
   state.currentClientId = createClientId();
   state.currentAttachments = [];
+  state.currentHistory = [];
   state.lastSavedSignature = '';
   form.reset();
   applyScopeDefaultsToForm();
@@ -545,12 +568,14 @@ function loadIdeaIntoForm(idea) {
   form.elements.status.value = normalizeStatus(idea.status);
   form.elements.priority.value = idea.priority || 'medium';
   form.elements.due_date.value = normalizeDateInput(idea.due_date || '');
+  form.elements.budget.value = idea.budget || idea.payload?.budget || idea.payload?.raw?.budget || '';
   form.elements.idea_type.value = idea.idea_type || '';
   form.elements.description.value = idea.description || '';
   form.elements.expected_impact.value = idea.expected_impact || '';
   form.elements.next_action.value = idea.next_action || '';
   form.elements.links.value = formatLinks(selectedLinks(idea));
   state.currentAttachments = selectedAttachments(idea);
+  state.currentHistory = normalizeHistory(idea);
   renderChoiceControls();
   renderPhotoPreview();
   mediaStatus.textContent = '';
@@ -854,6 +879,7 @@ function visibleIdeas() {
 }
 
 function renderRecords() {
+  if (!recordCount || !ideasTableWrap || !ideasBoard || !ideasBody) return;
   const ideas = visibleIdeas();
   recordCount.textContent = `${ideas.length}개 · ${viewLabel()}`;
   renderViewMode();
@@ -862,6 +888,7 @@ function renderRecords() {
 }
 
 function renderViewMode() {
+  if (!ideasTableWrap || !ideasBoard) return;
   const isBoard = state.viewMode === 'board';
   ideasTableWrap.hidden = isBoard;
   ideasBoard.hidden = !isBoard;
@@ -871,6 +898,7 @@ function renderViewMode() {
 }
 
 function renderTable(ideas) {
+  if (!ideasBody) return;
   if (!ideas.length) {
     ideasBody.innerHTML = '<tr class="empty-row"><td colspan="10">업무 없음</td></tr>';
     return;
@@ -897,6 +925,7 @@ function renderTable(ideas) {
 }
 
 function renderBoard(ideas) {
+  if (!ideasBoard) return;
   const columns = Object.entries(labels.status);
   ideasBoard.innerHTML = columns.map(([status, label]) => {
     const items = ideas.filter((idea) => normalizeStatus(idea.status) === status);
@@ -945,8 +974,10 @@ function renderTimeline() {
     return;
   }
 
-  timelineGroups.innerHTML = groups.map((group) => `
-    <section class="timeline-group">
+  timelineGroups.innerHTML = groups.map((group) => {
+    const timelineState = timelineGroupState(group.key);
+    return `
+    <section class="timeline-group timeline-${escapeHtml(timelineState)}" data-timeline-state="${escapeHtml(timelineState)}">
       <header>
         <div>
           <h4>${escapeHtml(group.label)}</h4>
@@ -958,7 +989,8 @@ function renderTimeline() {
         ${group.items.length ? group.items.map(renderTimelineItem).join('') : '<p>비어 있음</p>'}
       </div>
     </section>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function buildTimelineGroups(ideas) {
@@ -999,8 +1031,9 @@ function compareTimelineItems(a, b) {
 }
 
 function renderTimelineItem(idea) {
+  const timelineState = timelineGroupState(normalizeDateInput(idea.due_date || idea.payload?.due_date || '') || 'none');
   return `
-    <article class="timeline-item" data-timeline-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
+    <article class="timeline-item timeline-${escapeHtml(timelineState)}" data-timeline-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
       <div>
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
         <span>${escapeHtml(taskMeta([idea.owner || '담당자 미정', idea.store || '매장 전체', idea.project_name]))}</span>
@@ -1011,6 +1044,30 @@ function renderTimelineItem(idea) {
       </div>
     </article>
   `;
+}
+
+function timelineGroupState(key) {
+  if (!key || key === 'none') return 'none';
+  const target = dateOnlyTime(key);
+  const today = todayTime();
+  if (target < today) return 'past';
+  if (target === today) return 'today';
+  return 'future';
+}
+
+function queueTimelineLanding() {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(scrollTimelineToToday);
+  });
+}
+
+function scrollTimelineToToday() {
+  if (state.activeTab !== 'timeline' || !timelineGroups) return;
+  const target = timelineGroups.querySelector('[data-timeline-state="today"]') ||
+    timelineGroups.querySelector('[data-timeline-state="future"]') ||
+    timelineGroups.querySelector('[data-timeline-state="none"]') ||
+    timelineGroups.querySelector('.timeline-group');
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function formatTimelineDate(value) {
@@ -1165,7 +1222,7 @@ function handleProjectBoardClick(event) {
     syncTaskFilterControls();
     setActiveTab('tasks');
     render();
-    document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollTaskWorkspace();
     return;
   }
 
@@ -1274,9 +1331,11 @@ async function deleteCurrentModalIdea() {
   if (!idea) return;
   const ok = window.confirm(`"${idea.title || '제목 없음'}" 업무를 삭제할까요?`);
   if (!ok) return;
+  const actor = currentActor();
+  recordBrowserActivity('삭제', idea, actor);
   setSaveState('saving', '삭제 중');
   try {
-    const response = await fetch(`${API_IDEAS_URL}/${encodeURIComponent(idea.client_id)}`, { method: 'DELETE' });
+    const response = await fetch(`${API_IDEAS_URL}/${encodeURIComponent(idea.client_id)}?actor=${encodeURIComponent(actor)}`, { method: 'DELETE' });
     if (!response.ok) throw new Error('delete_failed');
     const payload = await response.json();
     storageMode.textContent = payload.supabaseEnabled ? 'Supabase 연결' : '로컬 저장';
@@ -1311,6 +1370,8 @@ function renderTaskModalBody(idea) {
     ['담당자', idea.owner || '담당자 미정'],
     ['상태', statusName(idea.status)],
     ['기한', formatDate(normalizeDateInput(idea.due_date || '')) || '기한 없음'],
+    ['예산', formatBudget(idea.budget || idea.payload?.budget || idea.payload?.raw?.budget)],
+    ['작업자', latestActorLabel(idea)],
     ['우선순위', priorityName(idea.priority)],
     ['구분', normalizeWorkType(idea.work_type)],
     ['카테고리', ideaScopeLabel(idea)]
@@ -1357,7 +1418,11 @@ function handleProgressClick(event) {
   syncTaskFilterControls();
   setActiveTab('tasks');
   render();
-  document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollTaskWorkspace();
+}
+
+function scrollTaskWorkspace() {
+  document.querySelector('#memberTasks')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function handleQuickFilterClick(event) {
@@ -1837,6 +1902,89 @@ function normalizeWorkType(value) {
   return WORK_TYPES.includes(candidate) ? candidate : '아이디어';
 }
 
+function currentActor() {
+  const globalUser = window.FLY_SPACE_USER;
+  const globalActor = typeof globalUser === 'string'
+    ? globalUser
+    : globalUser?.id || globalUser?.name || globalUser?.email || '';
+  try {
+    return String(globalActor || localStorage.getItem(ACTOR_STORAGE_KEY) || '로그인 대기').trim() || '로그인 대기';
+  } catch {
+    return String(globalActor || '로그인 대기').trim() || '로그인 대기';
+  }
+}
+
+function withActionMetadata(idea, action) {
+  const actor = currentActor();
+  const at = new Date().toISOString();
+  const history = normalizeHistory(idea);
+  const latest = history.at(-1);
+  const entry = { action, actor, at };
+  const nextHistory = latest && latest.action === action && latest.actor === actor && withinRecentMinute(latest.at, at)
+    ? [...history.slice(0, -1), entry]
+    : [...history, entry].slice(-50);
+
+  return {
+    ...idea,
+    updated_by: actor,
+    payload: {
+      ...(idea.payload || {}),
+      updated_by: actor,
+      history: nextHistory
+    }
+  };
+}
+
+function normalizeHistory(source) {
+  const values = Array.isArray(source)
+    ? source
+    : Array.isArray(source?.payload?.history)
+      ? source.payload.history
+      : [];
+  return values.map((item) => ({
+    action: String(item?.action || '').trim(),
+    actor: String(item?.actor || '').trim() || '로그인 대기',
+    at: String(item?.at || '').trim()
+  })).filter((item) => item.action && item.at);
+}
+
+function withinRecentMinute(previous, next) {
+  const prevTime = new Date(previous).getTime();
+  const nextTime = new Date(next).getTime();
+  if (Number.isNaN(prevTime) || Number.isNaN(nextTime)) return false;
+  return Math.abs(nextTime - prevTime) <= 60 * 1000;
+}
+
+function latestHistoryActor(history) {
+  return normalizeHistory(history).at(-1)?.actor || currentActor();
+}
+
+function latestActorLabel(idea) {
+  const latest = normalizeHistory(idea).at(-1);
+  if (!latest) return currentActor();
+  return `${latest.actor} · ${latest.action}`;
+}
+
+function recordBrowserActivity(action, idea, actor = currentActor()) {
+  try {
+    const raw = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+    const values = raw ? JSON.parse(raw) : [];
+    const nextValues = [
+      ...(Array.isArray(values) ? values : []),
+      {
+        action,
+        actor,
+        at: new Date().toISOString(),
+        client_id: idea.client_id || '',
+        title: idea.title || ''
+      }
+    ].slice(-200);
+    localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(nextValues));
+  } catch {
+    // Activity logs are best-effort until login-backed history is wired in.
+  }
+}
+
 function majorCategories() {
   return state.categories
     .filter((category) => category.level === 'major')
@@ -2259,6 +2407,20 @@ function formatDate(value) {
   const [year, month, day] = value.split('-').map(Number);
   if (!year || !month || !day) return '';
   return `${month.toString().padStart(2, '0')}.${day.toString().padStart(2, '0')}`;
+}
+
+function normalizeBudget(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+}
+
+function formatBudget(value) {
+  const text = normalizeBudget(value);
+  if (!text) return '-';
+  const digits = text.replace(/[^\d]/g, '');
+  if (digits && digits === text.replace(/[, ]/g, '')) {
+    return `${Number(digits).toLocaleString('ko-KR')}원`;
+  }
+  return text;
 }
 
 function normalizeDateInput(value) {

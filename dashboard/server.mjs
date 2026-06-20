@@ -12,6 +12,7 @@ const publicDir = path.join(__dirname, 'public');
 const dataDir = path.join(repoRoot, 'data');
 const ideasFile = path.join(dataDir, 'dashboard-ideas.json');
 const categoriesFile = path.join(dataDir, 'dashboard-categories.json');
+const auditFile = path.join(dataDir, 'dashboard-audit-log.json');
 
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const STORES = ['머문래', '갤러리문래'];
@@ -43,6 +44,7 @@ const supabaseEnabled = Boolean(supabaseUrl && serviceRoleKey);
 await fs.mkdir(dataDir, { recursive: true });
 await ensureJsonFile(ideasFile, []);
 await ensureJsonFile(categoriesFile, DEFAULT_CATEGORIES);
+await ensureJsonFile(auditFile, []);
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -75,7 +77,8 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname.startsWith('/api/ideas/') && req.method === 'DELETE') {
       const clientId = decodeURIComponent(url.pathname.replace('/api/ideas/', '')).trim();
-      const deleted = await deleteIdea(clientId);
+      const actor = stringValue(url.searchParams.get('actor')) || '로그인 대기';
+      const deleted = await deleteIdea(clientId, actor);
       return sendJson(res, 200, { deleted, supabaseEnabled });
     }
 
@@ -192,9 +195,17 @@ async function saveIdea(input) {
   return idea;
 }
 
-async function deleteIdea(clientId) {
+async function deleteIdea(clientId, actor = '로그인 대기') {
   const id = stringValue(clientId);
   if (!id) throw new Error('missing_client_id');
+  const existing = (await readLocalIdeas()).find((item) => item.client_id === id);
+  await appendAuditLog({
+    action: '삭제',
+    actor: stringValue(actor) || '로그인 대기',
+    at: new Date().toISOString(),
+    client_id: id,
+    title: existing?.title || ''
+  });
   await deleteLocalIdea(id);
   const deleted = { client_id: id, remote_status: 'local_only' };
   if (supabaseEnabled) {
@@ -244,6 +255,9 @@ function normalizeIdea(input, now) {
   const tags = normalizeTags(safeInput.tags);
   const links = normalizeLinks(safeInput.links || safeInput.payload?.links || '');
   const attachments = normalizeAttachments(safeInput.attachments || safeInput.payload?.attachments || []);
+  const budget = stringValue(safeInput.budget || safeInput.payload?.budget || safeInput.payload?.raw?.budget);
+  const history = normalizeHistory(safeInput.payload?.history);
+  const updatedBy = stringValue(safeInput.updated_by || safeInput.payload?.updated_by || history.at(-1)?.actor);
   return {
     client_id: clientId,
     title: stringValue(safeInput.title),
@@ -256,6 +270,7 @@ function normalizeIdea(input, now) {
     status: allowedValue(safeInput.status, STATUSES) || 'idea',
     priority: allowedValue(safeInput.priority, PRIORITIES) || 'medium',
     due_date: normalizeDateInput(safeInput.due_date || safeInput.payload?.due_date || safeInput.payload?.raw?.due_date),
+    budget,
     idea_type: stringValue(safeInput.idea_type),
     description: stringValue(safeInput.description),
     expected_impact: stringValue(safeInput.expected_impact),
@@ -263,11 +278,15 @@ function normalizeIdea(input, now) {
     tags,
     links,
     attachments,
+    updated_by: updatedBy,
     payload: {
       source: 'idea-dashboard',
       raw: safeInput.payload?.raw || {},
       links,
       attachments,
+      budget,
+      updated_by: updatedBy,
+      history,
       due_date: normalizeDateInput(safeInput.due_date || safeInput.payload?.due_date || safeInput.payload?.raw?.due_date),
       category: {
         major: stringValue(safeInput.category_major),
@@ -305,6 +324,22 @@ async function saveLocalCategory(category) {
   if (index >= 0) categories[index] = { ...categories[index], ...category };
   else categories.push(category);
   await fs.writeFile(categoriesFile, `${JSON.stringify(mergeCategories(categories), null, 2)}\n`, 'utf8');
+}
+
+async function appendAuditLog(entry) {
+  const raw = await fs.readFile(auditFile, 'utf8');
+  const values = JSON.parse(raw);
+  const nextValues = [
+    ...(Array.isArray(values) ? values : []),
+    {
+      action: stringValue(entry.action),
+      actor: stringValue(entry.actor) || '로그인 대기',
+      at: stringValue(entry.at) || new Date().toISOString(),
+      client_id: stringValue(entry.client_id),
+      title: stringValue(entry.title)
+    }
+  ].slice(-500);
+  await fs.writeFile(auditFile, `${JSON.stringify(nextValues, null, 2)}\n`, 'utf8');
 }
 
 async function readSupabaseIdeas() {
@@ -411,6 +446,7 @@ function fromSupabaseRow(row) {
     status: row.status || 'idea',
     priority: row.priority || 'medium',
     due_date: normalizeDateInput(row.due_date || row.payload?.due_date || row.payload?.raw?.due_date),
+    budget: row.budget || row.payload?.budget || row.payload?.raw?.budget || '',
     idea_type: row.idea_type || '',
     description: row.description || '',
     expected_impact: row.expected_impact || '',
@@ -418,6 +454,7 @@ function fromSupabaseRow(row) {
     tags: row.tags || [],
     links: normalizeLinks(row.links || row.payload?.links || []),
     attachments: normalizeAttachments(row.attachments || row.payload?.attachments || []),
+    updated_by: row.updated_by || row.payload?.updated_by || '',
     payload: row.payload || {},
     saved_from: row.saved_from || 'idea-dashboard',
     created_at: row.created_at,
@@ -477,6 +514,15 @@ function normalizeTags(value) {
     .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+function normalizeHistory(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => ({
+    action: stringValue(item?.action),
+    actor: stringValue(item?.actor) || '로그인 대기',
+    at: stringValue(item?.at)
+  })).filter((item) => item.action && item.at).slice(-50);
 }
 
 function normalizeLinks(value) {
