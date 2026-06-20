@@ -18,7 +18,7 @@ const auditFile = path.join(dataDir, 'dashboard-audit-log.json');
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const STORES = ['머문래', '갤러리문래'];
 const STATUSES = ['idea', 'discussion', 'planning', 'progress', 'done'];
-const REQUEST_STATUSES = ['open', 'checking', 'done'];
+const REQUEST_STATUSES = ['open', 'waiting', 'scheduled', 'hold', 'done'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
 const MAX_LINKS = 12;
@@ -316,15 +316,19 @@ function normalizeTeamRequest(input) {
   const updatedAt = stringValue(safeInput.updated_at) || now;
   const history = normalizeHistory(safeInput.history || safeInput.payload?.history || []);
   const updatedBy = stringValue(safeInput.updated_by || history.at(-1)?.actor);
+  const requester = normalizeRequestUser(safeInput.requester, true);
+  const assignee = normalizeRequestUser(safeInput.assignee, false);
   return {
     id,
     title: stringValue(safeInput.title).slice(0, 120),
-    requester: allowedValue(safeInput.requester, USERS),
-    assignee: allowedValue(safeInput.assignee, USERS),
-    status: allowedValue(safeInput.status, REQUEST_STATUSES) || 'open',
+    requester,
+    assignee: assignee && assignee !== requester ? assignee : '',
+    status: normalizeRequestStatus(safeInput.status),
     store: allowedValue(safeInput.store, STORES),
     due_date: normalizeDateInput(safeInput.due_date),
+    response_due_date: normalizeDateInput(safeInput.response_due_date),
     description: stringValue(safeInput.description).slice(0, 2000),
+    feedback: stringValue(safeInput.feedback).slice(0, 1600),
     memo: stringValue(safeInput.memo).slice(0, 1200),
     created_by: stringValue(safeInput.created_by),
     updated_by: updatedBy,
@@ -601,13 +605,31 @@ function sortIdeas(a, b) {
 }
 
 function sortTeamRequests(a, b) {
-  const order = { open: 0, checking: 1, done: 2 };
+  const order = { open: 0, waiting: 1, scheduled: 2, hold: 3, done: 4 };
   const statusDiff = (order[a.status] ?? 0) - (order[b.status] ?? 0);
   if (statusDiff) return statusDiff;
   if (a.due_date && b.due_date && a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date);
   if (a.due_date && !b.due_date) return -1;
   if (!a.due_date && b.due_date) return 1;
   return `${b.updated_at || ''}${b.created_at || ''}`.localeCompare(`${a.updated_at || ''}${a.created_at || ''}`);
+}
+
+function normalizeRequestStatus(value) {
+  const legacy = {
+    checking: 'waiting',
+    review: 'waiting',
+    planned: 'scheduled',
+    progress: 'scheduled',
+    complete: 'done'
+  };
+  const status = legacy[stringValue(value)] || stringValue(value);
+  return REQUEST_STATUSES.includes(status) ? status : 'open';
+}
+
+function normalizeRequestUser(value, allowPending = false) {
+  const user = stringValue(value);
+  if (USERS.includes(user)) return user;
+  return allowPending && user === '로그인 대기' ? user : '';
 }
 
 function normalizeTags(value) {

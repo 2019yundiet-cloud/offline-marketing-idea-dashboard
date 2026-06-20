@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>Fly Space</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260620-teamrequests">
+    <link rel="stylesheet" href="styles.css?v=20260620-requestflow">
   </head>
   <body>
     <div class="app-shell">
@@ -43,9 +43,9 @@
         <nav class="app-tabs app-tabs-desktop" aria-label="주요 화면">
           <button type="button" data-app-tab="home" class="active">홈</button>
           <button type="button" data-app-tab="tasks">개별업무</button>
-          <button type="button" data-app-tab="requests">팀요청</button>
           <button type="button" data-app-tab="timeline">타임라인</button>
           <button type="button" data-app-tab="progress">진행상황</button>
+          <button type="button" data-app-tab="requests">팀요청</button>
         </nav>
 
         <section id="homePanel" class="tab-panel active" data-tab-panel="home">
@@ -250,21 +250,6 @@
         </section>
         </section>
 
-        <section id="requestsPanel" class="tab-panel" data-tab-panel="requests" hidden>
-          <section class="team-requests-section" aria-label="팀요청 사항">
-            <div class="section-heading">
-              <div>
-                <p class="section-mode">확인 요청</p>
-                <h3>팀요청</h3>
-                <span>팀원이 팀원에게 확인을 요청한 일을 기록하고 관리합니다.</span>
-              </div>
-              <button type="button" id="newTeamRequestButton" class="section-action-button">요청 추가</button>
-            </div>
-            <div id="teamRequestSummary" class="request-summary-grid"></div>
-            <div id="teamRequestList" class="team-request-list"></div>
-          </section>
-        </section>
-
         <section id="timelinePanel" class="tab-panel" data-tab-panel="timeline" hidden>
           <section class="timeline-section">
             <div class="section-heading">
@@ -300,14 +285,30 @@
             </div>
           </section>
         </section>
+
+        <section id="requestsPanel" class="tab-panel" data-tab-panel="requests" hidden>
+          <section class="team-requests-section" aria-label="팀요청 사항">
+            <div class="section-heading">
+              <div>
+                <p class="section-mode">확인 요청</p>
+                <h3>팀요청</h3>
+                <span>받은 요청은 알림으로 표시되고, 팝업에서 피드백을 남깁니다.</span>
+              </div>
+              <button type="button" id="newTeamRequestButton" class="section-action-button">요청 추가</button>
+            </div>
+            <div id="requestNotificationBanner" class="request-notification-banner" hidden></div>
+            <div id="teamRequestSummary" class="request-summary-grid"></div>
+            <div id="teamRequestList" class="team-request-list"></div>
+          </section>
+        </section>
       </main>
 
       <nav class="app-tabs app-tabs-mobile" aria-label="하단 화면 이동">
         <button type="button" data-app-tab="home" class="active">홈</button>
         <button type="button" data-app-tab="tasks">개별업무</button>
-        <button type="button" data-app-tab="requests">팀요청</button>
         <button type="button" data-app-tab="timeline">타임라인</button>
         <button type="button" data-app-tab="progress">진행상황</button>
+        <button type="button" data-app-tab="requests">팀요청</button>
       </nav>
 
       <div id="taskDetailModal" class="task-modal" hidden role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
@@ -343,18 +344,12 @@
               <span>요청 제목</span>
               <input name="title" type="text" placeholder="예: 7월 캠페인 문구 확인">
             </label>
-            <div class="form-control choice-backed-field">
+            <label class="requester-readonly-field">
               <span>요청자</span>
-              <select name="requester" hidden>
-                <option value="">선택</option>
-                <option value="준호">준호</option>
-                <option value="동원">동원</option>
-                <option value="보미">보미</option>
-                <option value="상준">상준</option>
-                <option value="유민">유민</option>
-              </select>
-              <div id="requesterChoices" class="choice-grid request-choice-grid" aria-label="요청자 선택"></div>
-            </div>
+              <input name="requester" type="hidden">
+              <strong id="requesterDisplay">로그인 대기</strong>
+              <small>로그인 정보 기준으로 자동 설정됩니다.</small>
+            </label>
             <div class="form-control choice-backed-field">
               <span>확인 담당자</span>
               <select name="assignee" hidden>
@@ -371,8 +366,10 @@
               <span>상태</span>
               <select name="status" hidden>
                 <option value="open">요청</option>
-                <option value="checking">확인중</option>
-                <option value="done">완료</option>
+                <option value="waiting">대기</option>
+                <option value="scheduled">진행예정</option>
+                <option value="hold">보류</option>
+                <option value="done">완수</option>
               </select>
               <div id="requestStatusChoices" class="choice-grid request-choice-grid" aria-label="요청 상태 선택"></div>
             </div>
@@ -389,9 +386,17 @@
               <span>기한</span>
               <input name="due_date" type="date">
             </label>
+            <label>
+              <span>회신 기한</span>
+              <input name="response_due_date" type="date">
+            </label>
             <label class="wide">
               <span>요청 내용</span>
               <textarea name="description" rows="5" placeholder="확인해 줬으면 하는 내용과 필요한 기준을 적어주세요."></textarea>
+            </label>
+            <label class="wide">
+              <span>담당자 피드백</span>
+              <textarea name="feedback" rows="4" placeholder="확인 결과, 진행 예정일, 보류 사유 등을 남겨주세요."></textarea>
             </label>
             <label class="wide">
               <span>메모</span>
@@ -405,6 +410,6 @@
         </form>
       </div>
     </div>
-    <script src="app.js?v=20260620-teamrequests" type="module"></script>
+    <script src="app.js?v=20260620-requestflow" type="module"></script>
   </body>
 </html>

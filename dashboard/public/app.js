@@ -34,6 +34,7 @@ const ownerProgress = document.querySelector('#ownerProgress');
 const teamRequestSummary = document.querySelector('#teamRequestSummary');
 const teamRequestList = document.querySelector('#teamRequestList');
 const newTeamRequestButton = document.querySelector('#newTeamRequestButton');
+const requestNotificationBanner = document.querySelector('#requestNotificationBanner');
 const taskDetailModal = document.querySelector('#taskDetailModal');
 const taskModalTitle = document.querySelector('#taskModalTitle');
 const taskModalKicker = document.querySelector('#taskModalKicker');
@@ -45,7 +46,7 @@ const teamRequestForm = document.querySelector('#teamRequestForm');
 const teamRequestModalTitle = document.querySelector('#teamRequestModalTitle');
 const teamRequestModalKicker = document.querySelector('#teamRequestModalKicker');
 const teamRequestDeleteButton = document.querySelector('#teamRequestDeleteButton');
-const requesterChoices = document.querySelector('#requesterChoices');
+const requesterDisplay = document.querySelector('#requesterDisplay');
 const assigneeChoices = document.querySelector('#assigneeChoices');
 const requestStatusChoices = document.querySelector('#requestStatusChoices');
 const requestStoreChoices = document.querySelector('#requestStoreChoices');
@@ -104,6 +105,8 @@ const API_TEAM_REQUESTS_URL = 'api/team-requests';
 const LOCAL_STORAGE_KEY = 'offline-marketing-ideas:v1';
 const CATEGORY_STORAGE_KEY = 'offline-marketing-categories:v1';
 const TEAM_REQUEST_STORAGE_KEY = 'fly-space-team-requests:v1';
+const TEAM_REQUEST_SEEN_STORAGE_KEY = 'fly-space-team-request-seen:v1';
+const TEAM_REQUEST_NOTIFIED_STORAGE_KEY = 'fly-space-team-request-notified:v1';
 const CATEGORY_COLLAPSE_STORAGE_KEY = 'offline-marketing-category-collapse:v1';
 const VIEW_MODE_STORAGE_KEY = 'offline-marketing-view-mode:v1';
 const ACTOR_STORAGE_KEY = 'fly-space-current-actor:v1';
@@ -111,7 +114,7 @@ const ACTIVITY_STORAGE_KEY = 'fly-space-activity-log:v1';
 const MAX_PHOTOS = 4;
 const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
-const VALID_TABS = ['home', 'tasks', 'requests', 'timeline', 'progress'];
+const VALID_TABS = ['home', 'tasks', 'timeline', 'progress', 'requests'];
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const TEAMS = [
   { name: '기획/실행팀', members: ['동원', '상준', '유민'] },
@@ -121,8 +124,10 @@ const STORES = ['머문래', '갤러리문래'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
 const REQUEST_STATUSES = [
   { value: 'open', label: '요청' },
-  { value: 'checking', label: '확인중' },
-  { value: 'done', label: '완료' }
+  { value: 'waiting', label: '대기' },
+  { value: 'scheduled', label: '진행예정' },
+  { value: 'hold', label: '보류' },
+  { value: 'done', label: '완수' }
 ];
 const REQUEST_STORE_OPTIONS = ['전체', ...STORES];
 const DUE_FILTERS = [
@@ -372,10 +377,6 @@ function bindChoiceControls() {
     form.elements.status.value = normalizeStatus(value);
     renderChoiceControls();
     scheduleSave();
-  });
-  bindChoiceGroup(requesterChoices, (value) => {
-    teamRequestForm.elements.requester.value = value;
-    renderRequestChoiceControls();
   });
   bindChoiceGroup(assigneeChoices, (value) => {
     teamRequestForm.elements.assignee.value = value;
@@ -901,8 +902,10 @@ function renderTeamRequests() {
   const counts = requestSummaryCounts(requests);
   teamRequestSummary.innerHTML = [
     { label: '요청', value: counts.open },
-    { label: '확인중', value: counts.checking },
-    { label: '완료', value: counts.done },
+    { label: '대기', value: counts.waiting },
+    { label: '진행예정', value: counts.scheduled },
+    { label: '보류', value: counts.hold },
+    { label: '완수', value: counts.done },
     { label: '지연', value: counts.overdue }
   ].map((item) => `
     <article class="request-summary-card">
@@ -910,6 +913,7 @@ function renderTeamRequests() {
       <strong>${item.value.toLocaleString('ko-KR')}</strong>
     </article>
   `).join('');
+  renderRequestNotificationBanner(requests);
 
   if (!requests.length) {
     teamRequestList.innerHTML = `
@@ -930,11 +934,11 @@ function requestSummaryCounts(requests) {
     acc[status] = (acc[status] || 0) + 1;
     if (isRequestOverdue(request)) acc.overdue += 1;
     return acc;
-  }, { open: 0, checking: 0, done: 0, overdue: 0 });
+  }, { open: 0, waiting: 0, scheduled: 0, hold: 0, done: 0, overdue: 0 });
 }
 
 function sortedTeamRequests(requests) {
-  const statusOrder = { open: 0, checking: 1, done: 2 };
+  const statusOrder = { open: 0, waiting: 1, scheduled: 2, hold: 3, done: 4 };
   return normalizeTeamRequests(requests).sort((a, b) => {
     const statusDiff = statusOrder[normalizeRequestStatus(a.status)] - statusOrder[normalizeRequestStatus(b.status)];
     if (statusDiff) return statusDiff;
@@ -951,8 +955,9 @@ function renderTeamRequestCard(request) {
   const status = normalizeRequestStatus(request.status);
   const assigneeTeam = teamNameForOwner(request.assignee);
   const people = `${request.requester || '요청자 미정'} → ${request.assignee || '담당자 미정'}`;
+  const unread = isRequestAssignedToCurrentActor(request) && !isTeamRequestSeen(request.id);
   return `
-    <article class="team-request-card request-status-${escapeHtml(status)}" data-team-request="${escapeHtml(request.id)}" role="button" tabindex="0">
+    <article class="team-request-card request-status-${escapeHtml(status)} ${unread ? 'unread' : ''}" data-team-request="${escapeHtml(request.id)}" role="button" tabindex="0">
       <header>
         <div>
           <strong>${escapeHtml(request.title || '제목 없음')}</strong>
@@ -960,13 +965,40 @@ function renderTeamRequestCard(request) {
         </div>
         <em>${escapeHtml(requestStatusLabel(status))}</em>
       </header>
-      ${request.description ? `<p>${escapeHtml(summaryText(request.description))}</p>` : ''}
       <footer>
-        <span>${escapeHtml(taskMeta([assigneeTeam, request.store || '전체 매장']))}</span>
-        ${renderRequestDueBadge(request)}
+        <span>${escapeHtml(taskMeta([assigneeTeam, request.store || '전체 매장', request.feedback ? '피드백 있음' : '피드백 대기']))}</span>
+        <span class="request-card-dates">
+          ${renderRequestDueBadge(request)}
+          ${renderResponseDueBadge(request)}
+        </span>
       </footer>
     </article>
   `;
+}
+
+function renderRequestNotificationBanner(requests) {
+  if (!requestNotificationBanner) return;
+  const assigned = requests.filter((request) => isRequestAssignedToCurrentActor(request) && !isTerminalRequest(request));
+  const unread = assigned.filter((request) => !isTeamRequestSeen(request.id));
+  queueRequestNotifications(unread);
+  if (!unread.length) {
+    requestNotificationBanner.hidden = true;
+    requestNotificationBanner.innerHTML = '';
+    return;
+  }
+  const first = unread[0];
+  requestNotificationBanner.hidden = false;
+  requestNotificationBanner.innerHTML = `
+    <div>
+      <strong>새 팀요청 ${unread.length.toLocaleString('ko-KR')}건</strong>
+      <span>${escapeHtml(first.requester || '요청자 미정')}님이 ${escapeHtml(first.title || '제목 없음')} 확인을 요청했습니다.</span>
+    </div>
+    <button type="button" data-open-request-alert="${escapeHtml(first.id)}">확인</button>
+  `;
+  requestNotificationBanner.querySelector('[data-open-request-alert]')?.addEventListener('click', () => {
+    const request = state.teamRequests.find((item) => item.id === first.id);
+    if (request) openTeamRequestModal(request);
+  });
 }
 
 function handleTeamRequestListClick(event) {
@@ -989,17 +1021,22 @@ function openTeamRequestModal(request = null) {
   if (!teamRequestModal || !teamRequestForm) return;
   const actor = currentActor();
   const actorName = USERS.includes(actor) ? actor : '';
+  const requester = request?.requester || actorName || '로그인 대기';
   state.currentRequestId = request?.id || createRequestId();
   teamRequestForm.reset();
   teamRequestForm.elements.title.value = request?.title || '';
-  teamRequestForm.elements.requester.value = request?.requester || actorName || '';
+  teamRequestForm.elements.requester.value = requester;
   teamRequestForm.elements.assignee.value = request?.assignee || '';
   teamRequestForm.elements.status.value = normalizeRequestStatus(request?.status || 'open');
   teamRequestForm.elements.store.value = request?.store || '';
   teamRequestForm.elements.due_date.value = normalizeDateInput(request?.due_date || '');
+  teamRequestForm.elements.response_due_date.value = normalizeDateInput(request?.response_due_date || '');
   teamRequestForm.elements.description.value = request?.description || '';
+  teamRequestForm.elements.feedback.value = request?.feedback || '';
   teamRequestForm.elements.memo.value = request?.memo || '';
-  if (teamRequestModalTitle) teamRequestModalTitle.textContent = request ? '요청 수정' : '요청 추가';
+  if (requesterDisplay) requesterDisplay.textContent = requester;
+  if (request && isRequestAssignedToCurrentActor(request)) markTeamRequestSeen(request.id);
+  if (teamRequestModalTitle) teamRequestModalTitle.textContent = request ? '요청 상세' : '요청 추가';
   if (teamRequestModalKicker) {
     teamRequestModalKicker.textContent = request
       ? taskMeta([requestStatusLabel(request.status), request.assignee || '담당자 미정'])
@@ -1019,6 +1056,7 @@ function closeTeamRequestModal() {
   teamRequestModal.hidden = true;
   document.body.classList.remove('modal-open');
   state.currentRequestId = '';
+  renderTeamRequests();
 }
 
 function handleTeamRequestModalClick(event) {
@@ -1033,10 +1071,15 @@ function handleTeamRequestModalClick(event) {
 
 async function saveTeamRequestFromModal(event) {
   event.preventDefault();
+  const existing = state.teamRequests.find((item) => item.id === state.currentRequestId);
   const request = collectTeamRequest();
   if (!request.title && !request.description) {
     setSaveState('idle', '입력 필요');
     teamRequestForm.elements.title?.focus();
+    return;
+  }
+  if (!request.assignee || request.assignee === request.requester) {
+    setSaveState('idle', '담당자 확인');
     return;
   }
   setSaveState('saving', '저장 중');
@@ -1053,6 +1096,9 @@ async function saveTeamRequestFromModal(event) {
   } catch {
     upsertTeamRequest(saveBrowserTeamRequest(request));
     storageMode.textContent = '브라우저 저장';
+  }
+  if (!existing || existing.assignee !== request.assignee) {
+    notifyAssignedTeamMember(request);
   }
   setSaveState('saved', '저장됨');
   closeTeamRequestModal();
@@ -1084,6 +1130,7 @@ function collectTeamRequest() {
   const now = new Date().toISOString();
   const actor = currentActor();
   const action = existing ? '수정' : '생성';
+  const requester = existing?.requester || normalizeRequester(data.get('requester') || actor);
   const history = [
     ...normalizeRequestHistory(existing?.history || existing?.payload?.history || []),
     { action, actor, at: now }
@@ -1091,12 +1138,14 @@ function collectTeamRequest() {
   return normalizeTeamRequest({
     id: state.currentRequestId || createRequestId(),
     title: data.get('title') || '',
-    requester: data.get('requester') || '',
+    requester,
     assignee: data.get('assignee') || '',
     status: data.get('status') || 'open',
     store: data.get('store') || '',
     due_date: data.get('due_date') || '',
+    response_due_date: data.get('response_due_date') || '',
     description: data.get('description') || '',
+    feedback: data.get('feedback') || '',
     memo: data.get('memo') || '',
     created_by: existing?.created_by || actor,
     updated_by: actor,
@@ -1117,8 +1166,14 @@ function upsertTeamRequest(request) {
 
 function renderRequestChoiceControls() {
   if (!teamRequestForm) return;
-  renderChoiceButtonGroup(requesterChoices, USERS, teamRequestForm.elements.requester?.value || '');
-  renderChoiceButtonGroup(assigneeChoices, USERS, teamRequestForm.elements.assignee?.value || '');
+  const requester = normalizeRequester(teamRequestForm.elements.requester?.value || currentActor());
+  const selectedAssignee = teamRequestForm.elements.assignee?.value || '';
+  const assigneeOptions = USERS.filter((user) => user !== requester);
+  if (requesterDisplay) requesterDisplay.textContent = requester;
+  if (selectedAssignee === requester) {
+    teamRequestForm.elements.assignee.value = '';
+  }
+  renderChoiceButtonGroup(assigneeChoices, assigneeOptions, teamRequestForm.elements.assignee?.value || '', '본인을 제외한 담당자를 선택');
   renderChoiceButtonGroup(
     requestStatusChoices,
     REQUEST_STATUSES.map((status) => status.value),
@@ -1135,8 +1190,8 @@ function normalizeTeamRequests(requests) {
 function normalizeTeamRequest(request) {
   if (!request || typeof request !== 'object') return null;
   const id = String(request.id || request.request_id || '').trim() || createRequestId();
-  const requester = USERS.includes(request.requester) ? request.requester : '';
-  const assignee = USERS.includes(request.assignee) ? request.assignee : '';
+  const requester = normalizeRequester(request.requester);
+  const assignee = USERS.includes(request.assignee) && request.assignee !== requester ? request.assignee : '';
   const store = STORES.includes(request.store) ? request.store : '';
   return {
     id,
@@ -1146,7 +1201,9 @@ function normalizeTeamRequest(request) {
     status: normalizeRequestStatus(request.status),
     store,
     due_date: normalizeDateInput(request.due_date || ''),
+    response_due_date: normalizeDateInput(request.response_due_date || ''),
     description: String(request.description || '').trim().slice(0, 2000),
+    feedback: String(request.feedback || '').trim().slice(0, 1600),
     memo: String(request.memo || '').trim().slice(0, 1200),
     created_by: String(request.created_by || '').trim(),
     updated_by: String(request.updated_by || '').trim(),
@@ -1167,7 +1224,14 @@ function normalizeRequestHistory(history) {
 }
 
 function normalizeRequestStatus(value) {
-  const status = String(value || '').trim();
+  const legacy = {
+    checking: 'waiting',
+    review: 'waiting',
+    planned: 'scheduled',
+    progress: 'scheduled',
+    complete: 'done'
+  };
+  const status = legacy[String(value || '').trim()] || String(value || '').trim();
   return REQUEST_STATUSES.some((item) => item.value === status) ? status : 'open';
 }
 
@@ -1191,6 +1255,110 @@ function renderRequestDueBadge(request) {
         ? 'today'
         : 'muted';
   return `<span class="due-badge ${escapeHtml(tone)}">${escapeHtml(formatDate(dueDate))}</span>`;
+}
+
+function renderResponseDueBadge(request) {
+  const dueDate = normalizeDateInput(request.response_due_date || '');
+  if (!dueDate) return '';
+  return `<span class="due-badge muted">회신 ${escapeHtml(formatDate(dueDate))}</span>`;
+}
+
+function normalizeRequester(value) {
+  const requester = String(value || '').trim();
+  if (USERS.includes(requester)) return requester;
+  const actor = currentActor();
+  return USERS.includes(actor) ? actor : '로그인 대기';
+}
+
+function isRequestAssignedToCurrentActor(request) {
+  const actor = currentActor();
+  return USERS.includes(actor) && request.assignee === actor;
+}
+
+function isTerminalRequest(request) {
+  return normalizeRequestStatus(request.status) === 'done';
+}
+
+function requestSeenKey(actor = currentActor()) {
+  return `${TEAM_REQUEST_SEEN_STORAGE_KEY}:${actor}`;
+}
+
+function requestNotifiedKey(actor = currentActor()) {
+  return `${TEAM_REQUEST_NOTIFIED_STORAGE_KEY}:${actor}`;
+}
+
+function readTeamRequestIdSet(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    const values = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(values) ? values.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveTeamRequestIdSet(key, values) {
+  try {
+    localStorage.setItem(key, JSON.stringify([...values].slice(-500)));
+  } catch {
+    // Notification state is best-effort browser state.
+  }
+}
+
+function isTeamRequestSeen(id) {
+  if (!id) return true;
+  return readTeamRequestIdSet(requestSeenKey()).has(id);
+}
+
+function markTeamRequestSeen(id) {
+  if (!id) return;
+  const seen = readTeamRequestIdSet(requestSeenKey());
+  seen.add(id);
+  saveTeamRequestIdSet(requestSeenKey(), seen);
+}
+
+function queueRequestNotifications(requests) {
+  if (!requests.length || typeof window.Notification === 'undefined') return;
+  const notified = readTeamRequestIdSet(requestNotifiedKey());
+  const fresh = requests.filter((request) => !notified.has(request.id));
+  if (!fresh.length) return;
+  for (const request of fresh) notified.add(request.id);
+  saveTeamRequestIdSet(requestNotifiedKey(), notified);
+  if (Notification.permission === 'granted') {
+    for (const request of fresh.slice(0, 3)) showBrowserRequestNotification(request);
+  }
+}
+
+function notifyAssignedTeamMember(request) {
+  if (!request?.id || typeof window.Notification === 'undefined') return;
+  if (!isRequestAssignedToCurrentActor(request)) return;
+  if (Notification.permission === 'granted') {
+    showBrowserRequestNotification(request);
+    return;
+  }
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().then((permission) => {
+      if (permission === 'granted') showBrowserRequestNotification(request);
+    }).catch(() => {});
+  }
+}
+
+function showBrowserRequestNotification(request) {
+  try {
+    const notification = new Notification('Fly Space 팀요청', {
+      body: `${request.requester || '요청자'}: ${request.title || '새 요청'}`,
+      tag: request.id,
+      silent: false
+    });
+    notification.addEventListener('click', () => {
+      window.focus();
+      setActiveTab('requests');
+      openTeamRequestModal(request);
+      notification.close();
+    });
+  } catch {
+    // Browser notifications are optional; the in-app banner remains the fallback.
+  }
 }
 
 function createRequestId() {

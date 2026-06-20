@@ -1026,8 +1026,56 @@ button:hover {
 
 .request-summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
+}
+
+.request-notification-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid #111;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: #111;
+  color: #fff;
+}
+
+.request-notification-banner[hidden] {
+  display: none;
+}
+
+.request-notification-banner div {
+  min-width: 0;
+}
+
+.request-notification-banner strong,
+.request-notification-banner span {
+  display: block;
+}
+
+.request-notification-banner strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.request-notification-banner span {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.request-notification-banner button {
+  flex: 0 0 auto;
+  border-color: rgba(255, 255, 255, 0.38);
+  background: #fff;
+  color: #111;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .request-summary-card {
@@ -1082,6 +1130,11 @@ button:hover {
   opacity: 0.62;
 }
 
+.team-request-card.unread {
+  border-color: #111;
+  box-shadow: inset 4px 0 0 #111;
+}
+
 .team-request-card header,
 .team-request-card footer {
   display: flex;
@@ -1123,6 +1176,14 @@ button:hover {
 .team-request-card p {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.request-card-dates {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .team-request-card em {
@@ -1484,6 +1545,29 @@ body.modal-open {
 .request-choice-grid button {
   min-height: 40px;
   border-radius: 12px;
+}
+
+.requester-readonly-field {
+  align-content: start;
+  min-width: 0;
+}
+
+.requester-readonly-field strong {
+  display: grid;
+  align-items: center;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  background: var(--surface-strong);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.requester-readonly-field small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .request-modal-footer .primary-action {
@@ -2698,9 +2782,22 @@ td small {
     flex-direction: column;
   }
 
+  .request-notification-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .request-notification-banner button {
+    width: 100%;
+  }
+
   .team-request-card em,
   .team-request-card .due-badge {
     width: fit-content;
+  }
+
+  .request-card-dates {
+    justify-content: flex-start;
   }
 
   .form-grid {
