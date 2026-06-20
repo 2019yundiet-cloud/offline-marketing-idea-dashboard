@@ -2,6 +2,7 @@ const form = document.querySelector('#ideaForm');
 const inputModal = document.querySelector('#input');
 const editorTitle = document.querySelector('#editorTitle');
 const editorCloseButton = document.querySelector('#editorCloseButton');
+const editorSaveButton = document.querySelector('#editorSaveButton');
 const saveStatus = document.querySelector('#saveStatus');
 const storageMode = document.querySelector('#storageMode');
 const ideasBody = document.querySelector('#ideasBody');
@@ -44,6 +45,10 @@ const activeScopePath = document.querySelector('#activeScopePath');
 const formScopeNote = document.querySelector('#formScopeNote');
 const categoryMajorSelect = document.querySelector('#categoryMajorSelect');
 const categorySubSelect = document.querySelector('#categorySubSelect');
+const categoryMajorChoices = document.querySelector('#categoryMajorChoices');
+const categorySubChoices = document.querySelector('#categorySubChoices');
+const storeChoices = document.querySelector('#storeChoices');
+const statusChoices = document.querySelector('#statusChoices');
 const scopeFieldMajor = document.querySelector('[data-scope-field="category_major"]');
 const scopeFieldSubcategory = document.querySelector('[data-scope-field="category_sub"]');
 const scopeFieldStore = document.querySelector('[data-scope-field="store"]');
@@ -187,6 +192,10 @@ function bindAutosave() {
     if (event.target === photoInput) return;
     scheduleSave();
   });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    saveEditorNow();
+  });
   photoInput.addEventListener('change', handlePhotoSelect);
   photoPreview.addEventListener('click', handlePhotoPreviewClick);
   if (quickFilters) {
@@ -220,6 +229,10 @@ function bindAutosave() {
     renderSubcategoryOptions(categoryMajorSelect.value, '');
     scheduleSave();
   });
+  bindChoiceControls();
+  if (editorSaveButton) {
+    editorSaveButton.addEventListener('click', saveEditorNow);
+  }
   if (editorCloseButton) {
     editorCloseButton.addEventListener('click', closeEditorModal);
   }
@@ -285,6 +298,38 @@ function bindAutosave() {
     event.preventDefault();
     const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
     if (idea) openTaskModal(idea);
+  });
+}
+
+function bindChoiceControls() {
+  bindChoiceGroup(categoryMajorChoices, (value) => {
+    form.elements.category_major.value = value;
+    renderSubcategoryOptions(value, '');
+    scheduleSave();
+  });
+  bindChoiceGroup(categorySubChoices, (value) => {
+    form.elements.category_sub.value = value;
+    renderChoiceControls();
+    scheduleSave();
+  });
+  bindChoiceGroup(storeChoices, (value) => {
+    form.elements.store.value = value;
+    renderChoiceControls();
+    scheduleSave();
+  });
+  bindChoiceGroup(statusChoices, (value) => {
+    form.elements.status.value = normalizeStatus(value);
+    renderChoiceControls();
+    scheduleSave();
+  });
+}
+
+function bindChoiceGroup(container, onChange) {
+  if (!container) return;
+  container.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-choice-value]');
+    if (!button) return;
+    onChange(button.dataset.choiceValue || '');
   });
 }
 
@@ -417,6 +462,16 @@ function collectIdea() {
   const data = new FormData(form);
   const links = parseLinks(data.get('links') || '');
   const attachments = normalizeAttachments(state.currentAttachments);
+  const raw = rawFormData(data);
+  const values = form.elements;
+  const owner = values.owner?.value || '';
+  const status = normalizeStatus(values.status?.value || data.get('status') || 'idea');
+  const priority = values.priority?.value || data.get('priority') || 'medium';
+  const ideaType = values.idea_type?.value || data.get('idea_type') || '';
+  raw.owner = owner;
+  raw.status = status;
+  raw.priority = priority;
+  raw.idea_type = ideaType;
   return {
     client_id: state.currentClientId,
     title: data.get('title') || '',
@@ -425,11 +480,11 @@ function collectIdea() {
     category_major: data.get('category_major') || '',
     category_sub: data.get('category_sub') || '',
     store: data.get('store') || '',
-    owner: data.get('owner') || '',
-    status: data.get('status') || 'idea',
-    priority: data.get('priority') || 'medium',
+    owner,
+    status,
+    priority,
     due_date: normalizeDateInput(data.get('due_date') || ''),
-    idea_type: data.get('idea_type') || '',
+    idea_type: ideaType,
     description: data.get('description') || '',
     expected_impact: data.get('expected_impact') || '',
     next_action: data.get('next_action') || '',
@@ -437,7 +492,7 @@ function collectIdea() {
     links,
     attachments,
     payload: {
-      raw: rawFormData(data),
+      raw,
       links,
       attachments
     }
@@ -469,6 +524,7 @@ function resetForm() {
   applyScopeDefaultsToForm();
   form.querySelector('[name="status"]').value = 'idea';
   form.querySelector('[name="priority"]').value = 'medium';
+  renderChoiceControls();
   renderPhotoPreview();
   mediaStatus.textContent = '';
   updateSnapshot(null);
@@ -495,6 +551,7 @@ function loadIdeaIntoForm(idea) {
   form.elements.next_action.value = idea.next_action || '';
   form.elements.links.value = formatLinks(selectedLinks(idea));
   state.currentAttachments = selectedAttachments(idea);
+  renderChoiceControls();
   renderPhotoPreview();
   mediaStatus.textContent = '';
   setSelectedTags(selectedTags(idea));
@@ -508,6 +565,11 @@ function openEditorModal(mode = 'create') {
   if (!inputModal) return;
   state.editorMode = mode === 'edit' ? 'edit' : 'create';
   if (editorTitle) editorTitle.textContent = state.editorMode === 'edit' ? '업무 수정' : '업무 추가';
+  if (form.elements.owner) {
+    form.elements.owner.disabled = true;
+    form.elements.owner.setAttribute('aria-disabled', 'true');
+  }
+  renderChoiceControls();
   inputModal.hidden = false;
   inputModal.classList.add('open');
   document.body.classList.add('modal-open');
@@ -519,6 +581,19 @@ function closeEditorModal() {
   inputModal.classList.remove('open');
   inputModal.hidden = true;
   document.body.classList.remove('modal-open');
+}
+
+async function saveEditorNow() {
+  clearTimeout(state.saveTimer);
+  const idea = collectIdea();
+  if (!hasMeaningfulInput(idea)) {
+    setSaveState('idle', '입력 필요');
+    return;
+  }
+  setSaveState('saving', '저장 중');
+  state.pendingRequest = state.pendingRequest.then(saveCurrentIdea, saveCurrentIdea);
+  await state.pendingRequest;
+  closeEditorModal();
 }
 
 function upsertIdea(idea) {
@@ -546,6 +621,7 @@ function render() {
 }
 
 function renderMetrics() {
+  if (!Object.values(metrics).every(Boolean)) return;
   const totals = scopedIdeas().reduce((acc, idea) => {
     const status = normalizeStatus(idea.status);
     acc[status] += 1;
@@ -613,6 +689,7 @@ function storeSummary(store) {
 }
 
 function renderProjectGroups() {
+  if (!projectGroups || !projectBoardSummary) return;
   const ideas = projectSummaryIdeas();
   const groups = groupByProject(ideas);
   const selectedStore = normalizeScope(state.selectedScope).store;
@@ -1077,7 +1154,6 @@ function handleStoreWarRoomClick(event) {
   if (!button) return;
   state.filters.store = 'all';
   setSelectedScope({ kind: 'store', major: '', subcategory: '', store: button.dataset.storeRoom || '' });
-  document.querySelector('#projectBoard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function handleProjectBoardClick(event) {
@@ -1597,6 +1673,43 @@ function renderSubcategoryOptions(majorName, selectedSubcategory = form.elements
     ...subs.map((category) => `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`)
   ].join('');
   categorySubSelect.value = subs.some((category) => category.name === selectedSubcategory) ? selectedSubcategory : '';
+  renderChoiceControls();
+}
+
+function renderChoiceControls() {
+  renderChoiceButtonGroup(categoryMajorChoices, majorCategories().map((category) => category.name), form.elements.category_major?.value || '');
+
+  const selectedMajor = form.elements.category_major?.value || '';
+  const selectedCategory = majorCategories().find((category) => category.name === selectedMajor);
+  const subcategoryOptions = selectedCategory ? subCategories(selectedCategory.id).map((category) => category.name) : [];
+  renderChoiceButtonGroup(
+    categorySubChoices,
+    subcategoryOptions,
+    form.elements.category_sub?.value || '',
+    selectedMajor ? '소카테고리 없음' : '대카테고리를 먼저 선택'
+  );
+
+  renderChoiceButtonGroup(storeChoices, STORES, form.elements.store?.value || '');
+  renderChoiceButtonGroup(statusChoices, Object.keys(labels.status), normalizeStatus(form.elements.status?.value || 'idea'), labels.status);
+}
+
+function renderChoiceButtonGroup(container, options, selectedValue, labelMapOrEmptyText = null) {
+  if (!container) return;
+  if (!options.length) {
+    container.innerHTML = `<span class="choice-empty">${escapeHtml(typeof labelMapOrEmptyText === 'string' ? labelMapOrEmptyText : '선택 항목 없음')}</span>`;
+    return;
+  }
+
+  const labelMap = labelMapOrEmptyText && typeof labelMapOrEmptyText === 'object' ? labelMapOrEmptyText : null;
+  container.innerHTML = options.map((value) => {
+    const active = value === selectedValue;
+    const label = labelMap ? labelMap[value] : value;
+    return `
+      <button type="button" class="${active ? 'active' : ''}" data-choice-value="${escapeHtml(value)}" aria-pressed="${String(active)}">
+        ${escapeHtml(label)}
+      </button>
+    `;
+  }).join('');
 }
 
 function scopedIdeas() {
