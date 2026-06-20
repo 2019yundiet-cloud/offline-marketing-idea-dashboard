@@ -7,14 +7,26 @@ const ideasBoard = document.querySelector('#ideasBoard');
 const ideasTableWrap = document.querySelector('#ideasTableWrap');
 const recordCount = document.querySelector('#recordCount');
 const stageTabs = document.querySelector('#stageTabs');
+const appTabButtons = document.querySelectorAll('[data-app-tab]');
+const tabPanels = document.querySelectorAll('[data-tab-panel]');
 const viewModeButtons = document.querySelectorAll('[data-view-mode]');
 const quickFilters = document.querySelector('#quickFilters');
 const projectSearch = document.querySelector('#projectSearch');
 const clearFiltersButton = document.querySelector('#clearFiltersButton');
+const taskStatusFilter = document.querySelector('#taskStatusFilter');
+const taskOwnerFilter = document.querySelector('#taskOwnerFilter');
+const taskStoreFilter = document.querySelector('#taskStoreFilter');
+const taskWorkTypeFilter = document.querySelector('#taskWorkTypeFilter');
+const taskDueFilter = document.querySelector('#taskDueFilter');
 const storeWarRoom = document.querySelector('#storeWarRoom');
 const storeCards = document.querySelector('#storeCards');
 const projectGroups = document.querySelector('#projectGroups');
 const projectBoardSummary = document.querySelector('#projectBoardSummary');
+const timelineGroups = document.querySelector('#timelineGroups');
+const progressSummary = document.querySelector('#progressSummary');
+const progressStatusGrid = document.querySelector('#progressStatusGrid');
+const storeProgress = document.querySelector('#storeProgress');
+const ownerProgress = document.querySelector('#ownerProgress');
 const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
 const allScopeCount = document.querySelector('#allScopeCount');
@@ -68,6 +80,7 @@ const VIEW_MODE_STORAGE_KEY = 'offline-marketing-view-mode:v1';
 const MAX_PHOTOS = 4;
 const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
+const VALID_TABS = ['home', 'tasks', 'timeline', 'progress'];
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const STORES = ['머문래', '갤러리문래'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
@@ -85,7 +98,7 @@ const DEFAULT_CATEGORIES = [
   { id: 'cat_marketing_online', level: 'sub', parent_id: 'cat_marketing', name: '온라인마케팅', sort_order: 21 },
   { id: 'cat_marketing_offline', level: 'sub', parent_id: 'cat_marketing', name: '오프라인 마케팅', sort_order: 22 },
   { id: 'cat_project', level: 'major', parent_id: '', name: '프로젝트', sort_order: 30 },
-  { id: 'cat_project_plan', level: 'sub', parent_id: 'cat_project', name: '기획안 관리', sort_order: 31 }
+  { id: 'cat_project_plan', level: 'sub', parent_id: 'cat_project', name: '프로젝트 관리', sort_order: 31 }
 ];
 const REMOVED_DEFAULT_CATEGORY_IDS = new Set(['cat_menu', 'cat_menu_new']);
 
@@ -96,6 +109,7 @@ const state = {
   ideas: [],
   selectedScope: { kind: 'all', major: '', subcategory: '', store: '' },
   collapsedMajors: readCollapsedMajors(),
+  activeTab: readActiveTab(),
   selectedStage: 'all',
   filters: { owner: 'all', store: 'all', workType: 'all', due: 'all', query: '' },
   viewMode: readViewMode(),
@@ -106,10 +120,44 @@ const state = {
 
 initialize();
 
+function readActiveTab() {
+  const tab = String(window.location.hash || '').replace('#', '');
+  return VALID_TABS.includes(tab) ? tab : 'home';
+}
+
+function ensureHashTab() {
+  if (window.location.hash && VALID_TABS.includes(window.location.hash.slice(1))) return;
+  window.history.replaceState(null, '', '#home');
+  state.activeTab = 'home';
+}
+
+function setActiveTab(tab) {
+  const nextTab = VALID_TABS.includes(tab) ? tab : 'home';
+  state.activeTab = nextTab;
+  if (window.location.hash !== `#${nextTab}`) {
+    window.location.hash = nextTab;
+  }
+  renderAppTabs();
+}
+
+function renderAppTabs() {
+  for (const button of appTabButtons) {
+    button.classList.toggle('active', button.dataset.appTab === state.activeTab);
+    button.setAttribute('aria-current', button.dataset.appTab === state.activeTab ? 'page' : 'false');
+  }
+  for (const panel of tabPanels) {
+    const active = panel.dataset.tabPanel === state.activeTab;
+    panel.hidden = !active;
+    panel.classList.toggle('active', active);
+  }
+}
+
 async function initialize() {
   bindAutosave();
   await Promise.all([loadIdeas(), loadCategories()]);
   state.categories = mergeCategories(state.categories);
+  ensureHashTab();
+  populateTaskFilters();
   renderCategorySelects();
   render();
   setSaveState('idle', '대기');
@@ -138,6 +186,14 @@ function bindAutosave() {
   if (clearFiltersButton) {
     clearFiltersButton.addEventListener('click', clearQuickFilters);
   }
+  for (const button of appTabButtons) {
+    button.addEventListener('click', () => setActiveTab(button.dataset.appTab));
+  }
+  window.addEventListener('hashchange', () => {
+    state.activeTab = readActiveTab();
+    renderAppTabs();
+  });
+  bindTaskFilterControls();
   storeWarRoom.addEventListener('click', handleStoreWarRoomClick);
   projectGroups.addEventListener('click', handleProjectBoardClick);
   projectGroups.addEventListener('keydown', handleProjectBoardKeydown);
@@ -153,13 +209,24 @@ function bindAutosave() {
   for (const button of viewModeButtons) {
     button.addEventListener('click', () => setViewMode(button.dataset.viewMode));
   }
-  stageTabs.addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-stage]');
-    if (!button) return;
-    state.selectedStage = button.dataset.stage;
-    render();
-    document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
+  if (stageTabs) {
+    stageTabs.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-stage]');
+      if (!button) return;
+      state.selectedStage = button.dataset.stage;
+      syncTaskFilterControls();
+      render();
+      setActiveTab('tasks');
+      document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+  if (timelineGroups) {
+    timelineGroups.addEventListener('click', handleTimelineClick);
+    timelineGroups.addEventListener('keydown', handleTimelineKeydown);
+  }
+  if (progressStatusGrid) {
+    progressStatusGrid.addEventListener('click', handleProgressClick);
+  }
   ideasBody.addEventListener('click', (event) => {
     if (event.target.closest('a, button, input, textarea, select')) return;
     const row = event.target.closest('tr[data-id]');
@@ -189,6 +256,59 @@ function bindAutosave() {
     const idea = state.ideas.find((item) => item.client_id === card.dataset.id);
     if (idea) loadIdeaIntoForm(idea);
   });
+}
+
+function populateTaskFilters() {
+  fillSelect(taskOwnerFilter, USERS);
+  fillSelect(taskStoreFilter, STORES);
+  fillSelect(taskWorkTypeFilter, WORK_TYPES);
+  fillSelect(taskDueFilter, DUE_FILTERS.filter((filter) => filter.value !== 'all'), true);
+  syncTaskFilterControls();
+}
+
+function fillSelect(select, values, valuesAreOptions = false) {
+  if (!select) return;
+  const current = select.value || 'all';
+  const options = valuesAreOptions
+    ? values.map((option) => ({ value: option.value, label: option.label }))
+    : values.map((value) => ({ value, label: value }));
+  select.innerHTML = [
+    '<option value="all">전체</option>',
+    ...options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+  ].join('');
+  select.value = [...options.map((option) => option.value), 'all'].includes(current) ? current : 'all';
+}
+
+function bindTaskFilterControls() {
+  if (taskStatusFilter) {
+    taskStatusFilter.addEventListener('change', () => {
+      state.selectedStage = taskStatusFilter.value || 'all';
+      render();
+    });
+  }
+  bindFilterSelect(taskOwnerFilter, 'owner');
+  bindFilterSelect(taskStoreFilter, 'store');
+  bindFilterSelect(taskWorkTypeFilter, 'workType');
+  bindFilterSelect(taskDueFilter, 'due');
+}
+
+function bindFilterSelect(select, key) {
+  if (!select) return;
+  select.addEventListener('change', () => {
+    state.filters[key] = select.value || 'all';
+    render();
+  });
+}
+
+function syncTaskFilterControls() {
+  if (projectSearch && projectSearch.value !== state.filters.query) {
+    projectSearch.value = state.filters.query;
+  }
+  if (taskStatusFilter) taskStatusFilter.value = state.selectedStage;
+  if (taskOwnerFilter) taskOwnerFilter.value = state.filters.owner;
+  if (taskStoreFilter) taskStoreFilter.value = state.filters.store;
+  if (taskWorkTypeFilter) taskWorkTypeFilter.value = state.filters.workType;
+  if (taskDueFilter) taskDueFilter.value = state.filters.due;
 }
 
 async function loadIdeas() {
@@ -327,6 +447,7 @@ function resetForm() {
 }
 
 function loadIdeaIntoForm(idea) {
+  setActiveTab('tasks');
   state.currentClientId = idea.client_id;
   form.elements.title.value = idea.title || '';
   form.elements.work_type.value = normalizeWorkType(idea.work_type);
@@ -361,8 +482,10 @@ function upsertIdea(idea) {
 }
 
 function render() {
+  renderAppTabs();
   renderScopeHeader();
   updateScopeControlledFields();
+  syncTaskFilterControls();
   renderStoreWarRoom();
   if (quickFilters) renderQuickFilters();
   renderCategoryTree();
@@ -370,6 +493,8 @@ function render() {
   renderStageTabs();
   renderProjectGroups();
   renderRecords();
+  renderTimeline();
+  renderProgress();
 }
 
 function renderMetrics() {
@@ -386,6 +511,7 @@ function renderMetrics() {
 }
 
 function renderStageTabs() {
+  if (!stageTabs) return;
   const counts = scopedIdeas().reduce((acc, idea) => {
     const status = normalizeStatus(idea.status);
     acc.all += 1;
@@ -409,11 +535,11 @@ function renderStoreWarRoom() {
         <span class="store-room-name">${escapeHtml(store)}</span>
         <strong>${summary.total.toLocaleString('ko-KR')}</strong>
         <span class="store-room-meta">
-          <b>프로젝트 ${summary.projects.toLocaleString('ko-KR')}</b>
-          <b>지연 ${summary.overdue.toLocaleString('ko-KR')}</b>
+          <b><small>프로젝트</small>${summary.projects.toLocaleString('ko-KR')}</b>
+          <b><small>지연</small>${summary.overdue.toLocaleString('ko-KR')}</b>
         </span>
         <span class="store-room-stages">
-          ${Object.entries(labels.status).map(([status, label]) => `<em>${escapeHtml(label)} ${summary.statuses[status] || 0}</em>`).join('')}
+          ${Object.entries(labels.status).map(([status, label]) => `<em><small>${escapeHtml(label)}</small>${summary.statuses[status] || 0}</em>`).join('')}
         </span>
       </button>
     `;
@@ -421,8 +547,13 @@ function renderStoreWarRoom() {
 }
 
 function storeSummary(store) {
-  const filters = { ...state.filters, store: 'all' };
-  const ideas = state.ideas.filter((idea) => idea.store === store && matchesQuickFilters(idea, filters));
+  const scope = normalizeScope(state.selectedScope);
+  const ideas = state.ideas.filter((idea) => {
+    if (idea.store !== store) return false;
+    if (scope.major && idea.category_major !== scope.major) return false;
+    if (scope.subcategory && idea.category_sub !== scope.subcategory) return false;
+    return true;
+  });
   const projects = new Set(ideas.map(projectLabel)).size;
   const statuses = ideas.reduce((acc, idea) => {
     const status = normalizeStatus(idea.status);
@@ -434,7 +565,7 @@ function storeSummary(store) {
 }
 
 function renderProjectGroups() {
-  const ideas = visibleIdeas();
+  const ideas = projectSummaryIdeas();
   const groups = groupByProject(ideas);
   const selectedStore = normalizeScope(state.selectedScope).store;
   projectBoardSummary.textContent = selectedStore
@@ -468,6 +599,10 @@ function renderProjectGroups() {
       </div>
     </article>
   `).join('');
+}
+
+function projectSummaryIdeas() {
+  return state.ideas.filter((idea) => matchesScope(idea, state.selectedScope));
 }
 
 function renderProjectTask(idea) {
@@ -537,7 +672,7 @@ function renderViewMode() {
 
 function renderTable(ideas) {
   if (!ideas.length) {
-    ideasBody.innerHTML = '<tr class="empty-row"><td colspan="10">기획안 없음</td></tr>';
+    ideasBody.innerHTML = '<tr class="empty-row"><td colspan="10">업무 없음</td></tr>';
     return;
   }
   ideasBody.innerHTML = ideas.slice(0, 120).map((idea) => `
@@ -595,6 +730,149 @@ function renderBoardCard(idea) {
       </footer>
     </article>
   `;
+}
+
+function renderTimeline() {
+  if (!timelineGroups) return;
+  const groups = buildTimelineGroups(scopedIdeas());
+  if (!groups.some((group) => group.items.length)) {
+    timelineGroups.innerHTML = `
+      <div class="timeline-empty">
+        <strong>표시할 일정이 없습니다.</strong>
+        <span>개별업무에서 기한을 입력하면 이곳에 자동으로 정리됩니다.</span>
+      </div>
+    `;
+    return;
+  }
+
+  timelineGroups.innerHTML = groups.map((group) => `
+    <section class="timeline-group">
+      <header>
+        <h4>${escapeHtml(group.label)}</h4>
+        <strong>${group.items.length.toLocaleString('ko-KR')}</strong>
+      </header>
+      <div class="timeline-item-list">
+        ${group.items.length ? group.items.map(renderTimelineItem).join('') : '<p>비어 있음</p>'}
+      </div>
+    </section>
+  `).join('');
+}
+
+function buildTimelineGroups(ideas) {
+  const groups = [
+    { key: 'overdue', label: '지연', items: [] },
+    { key: 'today', label: '오늘', items: [] },
+    { key: 'week', label: '이번 주', items: [] },
+    { key: 'future', label: '이후', items: [] },
+    { key: 'none', label: '기한 없음', items: [] }
+  ];
+  const groupByKey = new Map(groups.map((group) => [group.key, group]));
+  for (const idea of ideas) {
+    groupByKey.get(timelineKey(idea)).items.push(idea);
+  }
+  for (const group of groups) {
+    group.items.sort(compareTimelineItems);
+  }
+  return groups;
+}
+
+function timelineKey(idea) {
+  const dueDate = normalizeDateInput(idea.due_date || idea.payload?.due_date || '');
+  if (!dueDate) return 'none';
+  const dueTime = dateOnlyTime(dueDate);
+  const today = todayTime();
+  const weekEnd = today + (6 * 24 * 60 * 60 * 1000);
+  if (normalizeStatus(idea.status) !== 'done' && dueTime < today) return 'overdue';
+  if (dueTime === today) return 'today';
+  if (dueTime > today && dueTime <= weekEnd) return 'week';
+  return 'future';
+}
+
+function compareTimelineItems(a, b) {
+  const aDate = normalizeDateInput(a.due_date || '');
+  const bDate = normalizeDateInput(b.due_date || '');
+  if (aDate && bDate && aDate !== bDate) return aDate.localeCompare(bDate);
+  if (aDate && !bDate) return -1;
+  if (!aDate && bDate) return 1;
+  return `${b.updated_at || ''}${b.created_at || ''}`.localeCompare(`${a.updated_at || ''}${a.created_at || ''}`);
+}
+
+function renderTimelineItem(idea) {
+  return `
+    <article class="timeline-item" data-timeline-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
+      <div>
+        <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
+        <span>${escapeHtml([idea.store || '매장 전체', idea.project_name || '프로젝트 미지정', idea.owner || '담당자 미정'].join(' · '))}</span>
+      </div>
+      <div class="timeline-item-meta">
+        <span>${escapeHtml(statusName(idea.status))}</span>
+        ${renderDueBadge(idea)}
+      </div>
+    </article>
+  `;
+}
+
+function renderProgress() {
+  if (!progressStatusGrid) return;
+  const ideas = scopedIdeas();
+  const total = ideas.length;
+  const done = ideas.filter((idea) => normalizeStatus(idea.status) === 'done').length;
+  const doneRate = total ? Math.round((done / total) * 100) : 0;
+  if (progressSummary) {
+    progressSummary.textContent = `전체 완료율 ${doneRate}% · 완료 ${done.toLocaleString('ko-KR')} / 전체 ${total.toLocaleString('ko-KR')}`;
+  }
+
+  const statusCounts = ideas.reduce((acc, idea) => {
+    const status = normalizeStatus(idea.status);
+    acc[status] += 1;
+    return acc;
+  }, { idea: 0, discussion: 0, planning: 0, progress: 0, done: 0 });
+
+  progressStatusGrid.innerHTML = Object.entries(labels.status).map(([status, label]) => {
+    const count = statusCounts[status] || 0;
+    const rate = total ? Math.round((count / total) * 100) : 0;
+    return `
+      <button type="button" class="progress-status-card" data-progress-stage="${escapeHtml(status)}">
+        <span>${escapeHtml(label)}</span>
+        <strong>${count.toLocaleString('ko-KR')}</strong>
+        <em>${rate}%</em>
+      </button>
+    `;
+  }).join('');
+
+  renderProgressList(storeProgress, STORES.map((store) => progressRow(store, ideas.filter((idea) => idea.store === store))));
+  renderProgressList(ownerProgress, USERS.map((owner) => progressRow(owner, ideas.filter((idea) => idea.owner === owner))));
+}
+
+function progressRow(label, ideas) {
+  const total = ideas.length;
+  const done = ideas.filter((idea) => normalizeStatus(idea.status) === 'done').length;
+  const doing = ideas.filter((idea) => normalizeStatus(idea.status) === 'progress').length;
+  const overdue = ideas.filter((idea) => matchesDueFilter(idea, 'overdue')).length;
+  return {
+    label,
+    total,
+    done,
+    doing,
+    overdue,
+    rate: total ? Math.round((done / total) * 100) : 0
+  };
+}
+
+function renderProgressList(container, rows) {
+  if (!container) return;
+  container.innerHTML = rows.map((row) => `
+    <article class="progress-row">
+      <div>
+        <strong>${escapeHtml(row.label)}</strong>
+        <span>완료 ${row.done.toLocaleString('ko-KR')} · 진행 ${row.doing.toLocaleString('ko-KR')} · 지연 ${row.overdue.toLocaleString('ko-KR')}</span>
+      </div>
+      <div class="progress-row-meter" aria-label="${escapeHtml(`${row.label} 완료율 ${row.rate}%`)}">
+        <span style="width: ${row.rate}%"></span>
+      </div>
+      <b>${row.rate}%</b>
+    </article>
+  `).join('');
 }
 
 function updateSnapshot(idea) {
@@ -664,6 +942,9 @@ function handleProjectBoardClick(event) {
   if (projectButton) {
     state.filters.query = projectButton.dataset.projectName || '';
     if (projectSearch) projectSearch.value = state.filters.query;
+    state.selectedStage = 'all';
+    syncTaskFilterControls();
+    setActiveTab('tasks');
     render();
     document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
@@ -682,6 +963,32 @@ function handleProjectBoardKeydown(event) {
   event.preventDefault();
   const idea = state.ideas.find((item) => item.client_id === task.dataset.projectTask);
   if (idea) loadIdeaIntoForm(idea);
+}
+
+function handleTimelineClick(event) {
+  const item = event.target.closest('[data-timeline-task]');
+  if (!item) return;
+  const idea = state.ideas.find((candidate) => candidate.client_id === item.dataset.timelineTask);
+  if (idea) loadIdeaIntoForm(idea);
+}
+
+function handleTimelineKeydown(event) {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const item = event.target.closest('[data-timeline-task]');
+  if (!item) return;
+  event.preventDefault();
+  const idea = state.ideas.find((candidate) => candidate.client_id === item.dataset.timelineTask);
+  if (idea) loadIdeaIntoForm(idea);
+}
+
+function handleProgressClick(event) {
+  const button = event.target.closest('[data-progress-stage]');
+  if (!button) return;
+  state.selectedStage = button.dataset.progressStage || 'all';
+  syncTaskFilterControls();
+  setActiveTab('tasks');
+  render();
+  document.querySelector('#records').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function handleQuickFilterClick(event) {
@@ -704,7 +1011,9 @@ function handleQuickFilterClick(event) {
 
 function clearQuickFilters() {
   state.filters = { owner: 'all', store: 'all', workType: 'all', due: 'all', query: '' };
+  state.selectedStage = 'all';
   if (projectSearch) projectSearch.value = '';
+  syncTaskFilterControls();
   setSelectedScope({ kind: 'all', major: '', subcategory: '', store: '' });
 }
 
@@ -1073,7 +1382,7 @@ function scopeHeading(scope) {
   const normalized = normalizeScope(scope);
   if (normalized.kind === 'store') {
     return {
-      title: `${normalized.store} 워룸`,
+      title: normalized.store,
       context: [normalized.major, normalized.subcategory].filter(Boolean).join(' / ') || '매장별 프로젝트 관리'
     };
   }
@@ -1090,7 +1399,7 @@ function scopeHeading(scope) {
     };
   }
   return {
-    title: '기획안 보드',
+    title: '업무 보드',
     context: '전체 업무'
   };
 }
@@ -1175,7 +1484,8 @@ function mergeCategories(categories) {
 
 function normalizeCategory(category) {
   const id = String(category?.id || '').trim();
-  const name = String(category?.name || '').trim();
+  const rawName = String(category?.name || '').trim();
+  const name = id === 'cat_project_plan' ? '프로젝트 관리' : rawName;
   const level = category?.level === 'sub' ? 'sub' : 'major';
   const parentId = level === 'sub' ? String(category?.parent_id || '').trim() : '';
   if (!id || !name) return null;

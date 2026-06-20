@@ -28,7 +28,7 @@ const DEFAULT_CATEGORIES = [
   { id: 'cat_marketing_online', level: 'sub', parent_id: 'cat_marketing', name: '온라인마케팅', sort_order: 21 },
   { id: 'cat_marketing_offline', level: 'sub', parent_id: 'cat_marketing', name: '오프라인 마케팅', sort_order: 22 },
   { id: 'cat_project', level: 'major', parent_id: '', name: '프로젝트', sort_order: 30 },
-  { id: 'cat_project_plan', level: 'sub', parent_id: 'cat_project', name: '기획안 관리', sort_order: 31 }
+  { id: 'cat_project_plan', level: 'sub', parent_id: 'cat_project', name: '프로젝트 관리', sort_order: 31 }
 ];
 const REMOVED_DEFAULT_CATEGORY_IDS = new Set(['cat_menu', 'cat_menu_new']);
 
@@ -520,10 +520,11 @@ function mergeCategories(categories) {
 }
 
 function normalizeCategory(category) {
-  const name = stringValue(category?.name);
+  const rawName = stringValue(category?.name);
   const level = category?.level === 'sub' ? 'sub' : 'major';
   const parentId = level === 'sub' ? stringValue(category?.parent_id) : '';
-  const id = stringValue(category?.id) || createCategoryId(level, name, parentId);
+  const id = stringValue(category?.id) || createCategoryId(level, rawName, parentId);
+  const name = id === 'cat_project_plan' ? '프로젝트 관리' : rawName;
   if (!name) return null;
   return {
     id,

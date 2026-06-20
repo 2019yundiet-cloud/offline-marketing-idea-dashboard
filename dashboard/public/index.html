@@ -4,9 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#ffffff">
-    <title>오프라인 마케팅 아이디어 대시보드</title>
+    <title>Fly Space</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260620-noquick">
+    <link rel="stylesheet" href="styles.css?v=20260620-tabs">
   </head>
   <body>
     <div class="app-shell">
@@ -14,8 +14,8 @@
         <div class="brand">
           <span class="brand-mark"><img src="financier.svg" alt=""></span>
           <div>
-            <h1>기획안 관리</h1>
-            <p>매장 · 프로젝트 · 업무</p>
+            <h1>Fly Space</h1>
+            <p>Store · Project · Work</p>
           </div>
         </div>
         <a class="design-lab-link" href="designs/index.html" target="_blank" rel="noreferrer">디자인 시안 10개 보기</a>
@@ -31,7 +31,7 @@
       <main class="workspace">
         <header class="topbar">
           <div class="board-title">
-            <h2 id="boardTitle">기획안 보드</h2>
+            <h2 id="boardTitle">업무 보드</h2>
             <p class="active-scope-title" id="activeScopePath">전체 업무</p>
           </div>
           <div class="status-strip" aria-live="polite">
@@ -40,11 +40,19 @@
           </div>
         </header>
 
-        <section id="storeWarRoom" class="store-war-room" aria-label="매장 워룸">
+        <nav class="app-tabs app-tabs-desktop" aria-label="주요 화면">
+          <button type="button" data-app-tab="home" class="active">홈</button>
+          <button type="button" data-app-tab="tasks">개별업무</button>
+          <button type="button" data-app-tab="timeline">타임라인</button>
+          <button type="button" data-app-tab="progress">진행상황</button>
+        </nav>
+
+        <section id="homePanel" class="tab-panel active" data-tab-panel="home">
+        <section id="storeWarRoom" class="store-war-room" aria-label="매장">
           <div class="section-heading">
             <div>
               <p class="section-mode">매장 선택</p>
-              <h3>매장 워룸</h3>
+              <h3>Stores</h3>
               <span>매장을 클릭하면 해당 매장 안에서 프로젝트별 업무가 정리됩니다.</span>
             </div>
           </div>
@@ -74,33 +82,6 @@
           </article>
         </section>
 
-        <section class="stage-tabs" id="stageTabs" aria-label="단계 필터">
-          <button type="button" data-stage="all" class="active">
-            <span>전체</span>
-            <strong>0</strong>
-          </button>
-          <button type="button" data-stage="idea">
-            <span>아이디어</span>
-            <strong>0</strong>
-          </button>
-          <button type="button" data-stage="discussion">
-            <span>논의</span>
-            <strong>0</strong>
-          </button>
-          <button type="button" data-stage="planning">
-            <span>상세기획</span>
-            <strong>0</strong>
-          </button>
-          <button type="button" data-stage="progress">
-            <span>진행</span>
-            <strong>0</strong>
-          </button>
-          <button type="button" data-stage="done">
-            <span>완료</span>
-            <strong>0</strong>
-          </button>
-        </section>
-
         <section id="projectBoard" class="project-board-section" aria-label="프로젝트별 업무">
           <div class="section-heading">
             <div>
@@ -110,6 +91,51 @@
             </div>
           </div>
           <div id="projectGroups" class="project-group-grid"></div>
+        </section>
+        </section>
+
+        <section id="tasksPanel" class="tab-panel" data-tab-panel="tasks" hidden>
+        <section class="task-filter-bar" aria-label="업무 필터">
+          <label class="task-filter-wide">
+            <span>프로젝트 검색</span>
+            <input id="projectSearch" type="search" placeholder="프로젝트명, 제목, 내용">
+          </label>
+          <label>
+            <span>상태</span>
+            <select id="taskStatusFilter">
+              <option value="all">전체</option>
+              <option value="idea">아이디어</option>
+              <option value="discussion">논의</option>
+              <option value="planning">상세기획</option>
+              <option value="progress">진행</option>
+              <option value="done">완료</option>
+            </select>
+          </label>
+          <label>
+            <span>담당자</span>
+            <select id="taskOwnerFilter">
+              <option value="all">전체</option>
+            </select>
+          </label>
+          <label>
+            <span>매장</span>
+            <select id="taskStoreFilter">
+              <option value="all">전체</option>
+            </select>
+          </label>
+          <label>
+            <span>구분</span>
+            <select id="taskWorkTypeFilter">
+              <option value="all">전체</option>
+            </select>
+          </label>
+          <label>
+            <span>기한</span>
+            <select id="taskDueFilter">
+              <option value="all">전체</option>
+            </select>
+          </label>
+          <button type="button" id="clearFiltersButton">초기화</button>
         </section>
 
         <section id="records" class="records-section">
@@ -150,10 +176,10 @@
             <div class="form-header">
               <div>
                 <p class="section-mode">쓰기</p>
-                <h3>기획안 작성</h3>
+                <h3>업무 작성</h3>
                 <p id="formScopeNote" class="form-scope-note">전체 업무</p>
               </div>
-              <button type="button" id="newIdeaButton">새 기획안</button>
+              <button type="button" id="newIdeaButton">새 업무</button>
             </div>
 
             <div class="form-grid">
@@ -271,8 +297,52 @@
             </div>
           </form>
         </section>
+        </section>
+
+        <section id="timelinePanel" class="tab-panel" data-tab-panel="timeline" hidden>
+          <section class="timeline-section">
+            <div class="section-heading">
+              <div>
+                <p class="section-mode">기한 흐름</p>
+                <h3>타임라인</h3>
+                <span>기한 기준으로 해야 할 일을 묶어 보여줍니다.</span>
+              </div>
+            </div>
+            <div id="timelineGroups" class="timeline-groups"></div>
+          </section>
+        </section>
+
+        <section id="progressPanel" class="tab-panel" data-tab-panel="progress" hidden>
+          <section class="progress-section">
+            <div class="section-heading">
+              <div>
+                <p class="section-mode">업무 흐름</p>
+                <h3>진행상황</h3>
+                <span id="progressSummary">전체 완료율 0%</span>
+              </div>
+            </div>
+            <div id="progressStatusGrid" class="progress-status-grid"></div>
+            <div class="progress-columns">
+              <section>
+                <h4>매장별 진행</h4>
+                <div id="storeProgress" class="progress-list"></div>
+              </section>
+              <section>
+                <h4>담당자별 진행</h4>
+                <div id="ownerProgress" class="progress-list"></div>
+              </section>
+            </div>
+          </section>
+        </section>
       </main>
+
+      <nav class="app-tabs app-tabs-mobile" aria-label="하단 화면 이동">
+        <button type="button" data-app-tab="home" class="active">홈</button>
+        <button type="button" data-app-tab="tasks">개별업무</button>
+        <button type="button" data-app-tab="timeline">타임라인</button>
+        <button type="button" data-app-tab="progress">진행상황</button>
+      </nav>
     </div>
-    <script src="app.js?v=20260620-noquick" type="module"></script>
+    <script src="app.js?v=20260620-tabs" type="module"></script>
   </body>
 </html>
