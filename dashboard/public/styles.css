@@ -769,6 +769,7 @@ button:hover {
 .records-section,
 .store-war-room,
 .project-board-section,
+.member-tasks-section,
 .task-filter-bar,
 .timeline-section,
 .progress-section {
@@ -815,11 +816,123 @@ button:hover {
 .records-section,
 .store-war-room,
 .project-board-section,
+.member-tasks-section,
 .task-filter-bar,
 .timeline-section,
 .progress-section {
   min-width: 0;
   padding: 24px;
+}
+
+.member-task-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.member-task-group {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.member-task-group > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.member-task-group h4,
+.member-task-group p {
+  margin: 0;
+}
+
+.member-task-group h4 {
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.member-task-group header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.member-task-group header button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-color: var(--line);
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.member-task-list {
+  display: grid;
+  gap: 8px;
+}
+
+.member-task-list > p {
+  margin: 0;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.member-task-card {
+  display: grid;
+  gap: 10px;
+  min-height: 76px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.member-task-card:hover,
+.member-task-card:focus-visible {
+  border-color: #111;
+  background: #fafafa;
+  outline: none;
+}
+
+.member-task-card strong,
+.member-task-card span {
+  display: block;
+}
+
+.member-task-card strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.member-task-card span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.member-task-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .task-filter-bar {
@@ -874,6 +987,14 @@ button:hover {
   margin: 0;
   font-size: 15px;
   font-weight: 850;
+}
+
+.timeline-group header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .timeline-group > header strong {
@@ -1050,6 +1171,163 @@ button:hover {
   height: 100%;
   border-radius: inherit;
   background: #111;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.task-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.task-modal[hidden] {
+  display: none;
+}
+
+.task-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: rgba(17, 17, 17, 0.32);
+}
+
+.task-modal-backdrop:hover {
+  background: rgba(17, 17, 17, 0.32);
+}
+
+.task-modal-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+  width: min(100%, 620px);
+  max-height: min(82vh, 760px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  padding: 22px;
+}
+
+.task-modal-card > header,
+.task-modal-card > footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.task-modal-card > header h3,
+.task-modal-card > header p {
+  margin: 0;
+}
+
+.task-modal-card > header p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.task-modal-card > header h3 {
+  margin-top: 5px;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.task-modal-card button {
+  border-color: var(--line);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.task-modal-card > header button {
+  min-width: 76px;
+}
+
+.task-modal-card > footer {
+  justify-content: flex-end;
+}
+
+.task-modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.task-modal-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.task-modal-meta div {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.task-modal-meta dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.task-modal-meta dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 780;
+}
+
+.task-modal-section {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.task-modal-section h4,
+.task-modal-section p {
+  margin: 0;
+}
+
+.task-modal-section h4 {
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.task-modal-section p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.task-modal-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.task-modal-photos img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  object-fit: cover;
 }
 
 .form-header,
@@ -1728,6 +2006,7 @@ td small {
   .metric-grid,
   .store-card-grid,
   .project-group-grid,
+  .member-task-grid,
   .task-filter-bar,
   .progress-columns {
     grid-template-columns: 1fr;
@@ -1925,6 +2204,7 @@ td small {
   .records-section,
   .store-war-room,
   .project-board-section,
+  .member-tasks-section,
   .task-filter-bar,
   .timeline-section,
   .progress-section {
@@ -1939,6 +2219,7 @@ td small {
 
   .store-war-room .section-heading,
   .project-board-section .section-heading,
+  .member-tasks-section .section-heading,
   .timeline-section .section-heading,
   .progress-section .section-heading {
     padding: 0 16px;
@@ -1946,6 +2227,7 @@ td small {
 
   .store-card-grid,
   .project-group-grid,
+  .member-task-grid,
   .timeline-groups,
   .progress-status-grid,
   .progress-columns {
@@ -1986,6 +2268,29 @@ td small {
   .progress-row-meter {
     grid-column: 1 / -1;
     order: 3;
+  }
+
+  .task-modal {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .task-modal-card {
+    width: 100%;
+    max-height: min(86vh, 760px);
+    padding: 18px;
+  }
+
+  .task-modal-card > header {
+    align-items: flex-start;
+  }
+
+  .task-modal-card > header h3 {
+    font-size: 21px;
+  }
+
+  .task-modal-meta {
+    grid-template-columns: 1fr;
   }
 
   .form-grid {

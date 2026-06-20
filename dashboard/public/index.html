@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>Fly Space</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260620-tabs">
+    <link rel="stylesheet" href="styles.css?v=20260620-teamtimeline">
   </head>
   <body>
     <div class="app-shell">
@@ -95,6 +95,17 @@
         </section>
 
         <section id="tasksPanel" class="tab-panel" data-tab-panel="tasks" hidden>
+        <section id="memberTasks" class="member-tasks-section" aria-label="팀원별 업무">
+          <div class="section-heading">
+            <div>
+              <p class="section-mode">팀원별 관리</p>
+              <h3>개별업무</h3>
+              <span>팀원 이름 아래에서 업무를 추가하고 확인합니다.</span>
+            </div>
+          </div>
+          <div id="memberTaskGroups" class="member-task-grid"></div>
+        </section>
+
         <section class="task-filter-bar" aria-label="업무 필터">
           <label class="task-filter-wide">
             <span>프로젝트 검색</span>
@@ -342,7 +353,24 @@
         <button type="button" data-app-tab="timeline">타임라인</button>
         <button type="button" data-app-tab="progress">진행상황</button>
       </nav>
+
+      <div id="taskDetailModal" class="task-modal" hidden role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
+        <button type="button" class="task-modal-backdrop" data-modal-close aria-label="상세 닫기"></button>
+        <section class="task-modal-card">
+          <header>
+            <div>
+              <p id="taskModalKicker">업무 상세</p>
+              <h3 id="taskModalTitle">업무 상세</h3>
+            </div>
+            <button type="button" data-modal-close>닫기</button>
+          </header>
+          <div id="taskModalBody" class="task-modal-body"></div>
+          <footer>
+            <button type="button" id="taskModalEditButton">수정하기</button>
+          </footer>
+        </section>
+      </div>
     </div>
-    <script src="app.js?v=20260620-tabs" type="module"></script>
+    <script src="app.js?v=20260620-teamtimeline" type="module"></script>
   </body>
 </html>

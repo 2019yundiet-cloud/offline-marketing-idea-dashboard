@@ -22,11 +22,17 @@ const storeWarRoom = document.querySelector('#storeWarRoom');
 const storeCards = document.querySelector('#storeCards');
 const projectGroups = document.querySelector('#projectGroups');
 const projectBoardSummary = document.querySelector('#projectBoardSummary');
+const memberTaskGroups = document.querySelector('#memberTaskGroups');
 const timelineGroups = document.querySelector('#timelineGroups');
 const progressSummary = document.querySelector('#progressSummary');
 const progressStatusGrid = document.querySelector('#progressStatusGrid');
 const storeProgress = document.querySelector('#storeProgress');
 const ownerProgress = document.querySelector('#ownerProgress');
+const taskDetailModal = document.querySelector('#taskDetailModal');
+const taskModalTitle = document.querySelector('#taskModalTitle');
+const taskModalKicker = document.querySelector('#taskModalKicker');
+const taskModalBody = document.querySelector('#taskModalBody');
+const taskModalEditButton = document.querySelector('#taskModalEditButton');
 const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
 const allScopeCount = document.querySelector('#allScopeCount');
@@ -115,7 +121,8 @@ const state = {
   viewMode: readViewMode(),
   saveTimer: null,
   pendingRequest: Promise.resolve(),
-  lastSavedSignature: ''
+  lastSavedSignature: '',
+  modalIdeaId: ''
 };
 
 initialize();
@@ -226,6 +233,14 @@ function bindAutosave() {
   }
   if (progressStatusGrid) {
     progressStatusGrid.addEventListener('click', handleProgressClick);
+  }
+  if (memberTaskGroups) {
+    memberTaskGroups.addEventListener('click', handleMemberTaskClick);
+    memberTaskGroups.addEventListener('keydown', handleMemberTaskKeydown);
+  }
+  if (taskDetailModal) {
+    taskDetailModal.addEventListener('click', handleTaskModalClick);
+    document.addEventListener('keydown', handleTaskModalKeydown);
   }
   ideasBody.addEventListener('click', (event) => {
     if (event.target.closest('a, button, input, textarea, select')) return;
@@ -492,6 +507,7 @@ function render() {
   renderMetrics();
   renderStageTabs();
   renderProjectGroups();
+  renderMemberTasks();
   renderRecords();
   renderTimeline();
   renderProgress();
@@ -603,6 +619,47 @@ function renderProjectGroups() {
 
 function projectSummaryIdeas() {
   return state.ideas.filter((idea) => matchesScope(idea, state.selectedScope));
+}
+
+function renderMemberTasks() {
+  if (!memberTaskGroups) return;
+  const ideas = visibleIdeas();
+  const groups = [...USERS, '미지정'].map((owner) => {
+    const items = owner === '미지정'
+      ? ideas.filter((idea) => !String(idea.owner || '').trim())
+      : ideas.filter((idea) => idea.owner === owner);
+    return { owner, items };
+  });
+
+  memberTaskGroups.innerHTML = groups.map((group) => `
+    <section class="member-task-group">
+      <header>
+        <div>
+          <h4>${escapeHtml(group.owner)}</h4>
+          <span>${group.items.length.toLocaleString('ko-KR')}개 업무</span>
+        </div>
+        <button type="button" data-owner-new="${escapeHtml(group.owner)}">추가</button>
+      </header>
+      <div class="member-task-list">
+        ${group.items.length ? group.items.map(renderMemberTaskCard).join('') : '<p>업무 없음</p>'}
+      </div>
+    </section>
+  `).join('');
+}
+
+function renderMemberTaskCard(idea) {
+  return `
+    <article class="member-task-card" data-member-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
+      <div>
+        <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
+        <span>${escapeHtml([idea.project_name || '프로젝트 미지정', idea.store || '매장 전체'].join(' · '))}</span>
+      </div>
+      <footer>
+        <span>${escapeHtml(statusName(idea.status))}</span>
+        ${renderDueBadge(idea)}
+      </footer>
+    </article>
+  `;
 }
 
 function renderProjectTask(idea) {
@@ -748,7 +805,10 @@ function renderTimeline() {
   timelineGroups.innerHTML = groups.map((group) => `
     <section class="timeline-group">
       <header>
-        <h4>${escapeHtml(group.label)}</h4>
+        <div>
+          <h4>${escapeHtml(group.label)}</h4>
+          <span>${escapeHtml(group.caption)}</span>
+        </div>
         <strong>${group.items.length.toLocaleString('ko-KR')}</strong>
       </header>
       <div class="timeline-item-list">
@@ -759,33 +819,31 @@ function renderTimeline() {
 }
 
 function buildTimelineGroups(ideas) {
-  const groups = [
-    { key: 'overdue', label: '지연', items: [] },
-    { key: 'today', label: '오늘', items: [] },
-    { key: 'week', label: '이번 주', items: [] },
-    { key: 'future', label: '이후', items: [] },
-    { key: 'none', label: '기한 없음', items: [] }
-  ];
-  const groupByKey = new Map(groups.map((group) => [group.key, group]));
+  const groupByKey = new Map();
   for (const idea of ideas) {
-    groupByKey.get(timelineKey(idea)).items.push(idea);
+    const dueDate = normalizeDateInput(idea.due_date || idea.payload?.due_date || '');
+    const key = dueDate || 'none';
+    if (!groupByKey.has(key)) {
+      groupByKey.set(key, {
+        key,
+        label: dueDate ? formatTimelineDate(dueDate) : '기한 없음',
+        caption: dueDate ? timelineDateCaption(dueDate) : '날짜를 정하지 않은 업무',
+        items: []
+      });
+    }
+    groupByKey.get(key).items.push(idea);
   }
+  const groups = [...groupByKey.values()].sort(compareTimelineGroups);
   for (const group of groups) {
     group.items.sort(compareTimelineItems);
   }
   return groups;
 }
 
-function timelineKey(idea) {
-  const dueDate = normalizeDateInput(idea.due_date || idea.payload?.due_date || '');
-  if (!dueDate) return 'none';
-  const dueTime = dateOnlyTime(dueDate);
-  const today = todayTime();
-  const weekEnd = today + (6 * 24 * 60 * 60 * 1000);
-  if (normalizeStatus(idea.status) !== 'done' && dueTime < today) return 'overdue';
-  if (dueTime === today) return 'today';
-  if (dueTime > today && dueTime <= weekEnd) return 'week';
-  return 'future';
+function compareTimelineGroups(a, b) {
+  if (a.key === 'none') return 1;
+  if (b.key === 'none') return -1;
+  return a.key.localeCompare(b.key);
 }
 
 function compareTimelineItems(a, b) {
@@ -802,7 +860,7 @@ function renderTimelineItem(idea) {
     <article class="timeline-item" data-timeline-task="${escapeHtml(idea.client_id)}" role="button" tabindex="0">
       <div>
         <strong>${escapeHtml(idea.title || '제목 없음')}</strong>
-        <span>${escapeHtml([idea.store || '매장 전체', idea.project_name || '프로젝트 미지정', idea.owner || '담당자 미정'].join(' · '))}</span>
+        <span>${escapeHtml([idea.owner || '담당자 미정', idea.store || '매장 전체', idea.project_name || '프로젝트 미지정'].join(' · '))}</span>
       </div>
       <div class="timeline-item-meta">
         <span>${escapeHtml(statusName(idea.status))}</span>
@@ -810,6 +868,25 @@ function renderTimelineItem(idea) {
       </div>
     </article>
   `;
+}
+
+function formatTimelineDate(value) {
+  const [year, month, day] = normalizeDateInput(value).split('-').map(Number);
+  if (!year || !month || !day) return '기한 없음';
+  return new Date(year, month - 1, day).toLocaleDateString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short'
+  });
+}
+
+function timelineDateCaption(value) {
+  const time = dateOnlyTime(value);
+  const today = todayTime();
+  if (time === today) return '오늘';
+  if (time < today) return '지난 일정';
+  const diffDays = Math.round((time - today) / (24 * 60 * 60 * 1000));
+  return `${diffDays.toLocaleString('ko-KR')}일 후`;
 }
 
 function renderProgress() {
@@ -965,11 +1042,43 @@ function handleProjectBoardKeydown(event) {
   if (idea) loadIdeaIntoForm(idea);
 }
 
+function handleMemberTaskClick(event) {
+  const newButton = event.target.closest('[data-owner-new]');
+  if (newButton) {
+    startNewTaskForOwner(newButton.dataset.ownerNew || '');
+    return;
+  }
+
+  const card = event.target.closest('[data-member-task]');
+  if (!card) return;
+  const idea = state.ideas.find((item) => item.client_id === card.dataset.memberTask);
+  if (idea) loadIdeaIntoForm(idea);
+}
+
+function handleMemberTaskKeydown(event) {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const card = event.target.closest('[data-member-task]');
+  if (!card) return;
+  event.preventDefault();
+  const idea = state.ideas.find((item) => item.client_id === card.dataset.memberTask);
+  if (idea) loadIdeaIntoForm(idea);
+}
+
+function startNewTaskForOwner(owner) {
+  resetForm();
+  if (owner && owner !== '미지정') {
+    form.elements.owner.value = owner;
+  }
+  setActiveTab('tasks');
+  document.querySelector('#input').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  form.querySelector('[name="title"]').focus();
+}
+
 function handleTimelineClick(event) {
   const item = event.target.closest('[data-timeline-task]');
   if (!item) return;
   const idea = state.ideas.find((candidate) => candidate.client_id === item.dataset.timelineTask);
-  if (idea) loadIdeaIntoForm(idea);
+  if (idea) openTaskModal(idea);
 }
 
 function handleTimelineKeydown(event) {
@@ -978,7 +1087,93 @@ function handleTimelineKeydown(event) {
   if (!item) return;
   event.preventDefault();
   const idea = state.ideas.find((candidate) => candidate.client_id === item.dataset.timelineTask);
-  if (idea) loadIdeaIntoForm(idea);
+  if (idea) openTaskModal(idea);
+}
+
+function openTaskModal(idea) {
+  if (!taskDetailModal || !taskModalTitle || !taskModalBody) return;
+  state.modalIdeaId = idea.client_id;
+  taskModalTitle.textContent = idea.title || '제목 없음';
+  if (taskModalKicker) {
+    taskModalKicker.textContent = [idea.store || '매장 전체', idea.project_name || '프로젝트 미지정'].join(' · ');
+  }
+  taskModalBody.innerHTML = renderTaskModalBody(idea);
+  taskDetailModal.hidden = false;
+  taskDetailModal.classList.add('open');
+  document.body.classList.add('modal-open');
+  taskDetailModal.querySelector('[data-modal-close]')?.focus();
+}
+
+function closeTaskModal() {
+  if (!taskDetailModal) return;
+  taskDetailModal.classList.remove('open');
+  taskDetailModal.hidden = true;
+  document.body.classList.remove('modal-open');
+  state.modalIdeaId = '';
+}
+
+function handleTaskModalClick(event) {
+  if (event.target.closest('[data-modal-close]')) {
+    closeTaskModal();
+    return;
+  }
+  if (event.target === taskModalEditButton || event.target.closest('#taskModalEditButton')) {
+    const idea = state.ideas.find((item) => item.client_id === state.modalIdeaId);
+    closeTaskModal();
+    if (idea) loadIdeaIntoForm(idea);
+  }
+}
+
+function handleTaskModalKeydown(event) {
+  if (event.key === 'Escape' && taskDetailModal && !taskDetailModal.hidden) {
+    closeTaskModal();
+  }
+}
+
+function renderTaskModalBody(idea) {
+  const links = renderLinks(idea.links);
+  const attachments = selectedAttachments(idea);
+  const rows = [
+    ['담당자', idea.owner || '담당자 미정'],
+    ['상태', statusName(idea.status)],
+    ['기한', formatDate(normalizeDateInput(idea.due_date || '')) || '기한 없음'],
+    ['우선순위', priorityName(idea.priority)],
+    ['구분', normalizeWorkType(idea.work_type)],
+    ['카테고리', ideaScopeLabel(idea)]
+  ];
+  return `
+    <dl class="task-modal-meta">
+      ${rows.map(([label, value]) => `
+        <div>
+          <dt>${escapeHtml(label)}</dt>
+          <dd>${escapeHtml(value)}</dd>
+        </div>
+      `).join('')}
+    </dl>
+    ${renderModalTextSection('내용', idea.description)}
+    ${renderModalTextSection('기대 효과', idea.expected_impact)}
+    ${renderModalTextSection('다음 액션', idea.next_action)}
+    ${links ? `<section class="task-modal-section"><h4>링크</h4>${links}</section>` : ''}
+    ${attachments.length ? `
+      <section class="task-modal-section">
+        <h4>사진</h4>
+        <div class="task-modal-photos">
+          ${attachments.map((attachment) => `<img src="${escapeHtml(attachment.data_url)}" alt="${escapeHtml(attachment.name)}">`).join('')}
+        </div>
+      </section>
+    ` : ''}
+  `;
+}
+
+function renderModalTextSection(label, value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return `
+    <section class="task-modal-section">
+      <h4>${escapeHtml(label)}</h4>
+      <p>${escapeHtml(text)}</p>
+    </section>
+  `;
 }
 
 function handleProgressClick(event) {
