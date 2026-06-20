@@ -12,11 +12,13 @@ const publicDir = path.join(__dirname, 'public');
 const dataDir = path.join(repoRoot, 'data');
 const ideasFile = path.join(dataDir, 'dashboard-ideas.json');
 const categoriesFile = path.join(dataDir, 'dashboard-categories.json');
+const teamRequestsFile = path.join(dataDir, 'dashboard-team-requests.json');
 const auditFile = path.join(dataDir, 'dashboard-audit-log.json');
 
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const STORES = ['머문래', '갤러리문래'];
 const STATUSES = ['idea', 'discussion', 'planning', 'progress', 'done'];
+const REQUEST_STATUSES = ['open', 'checking', 'done'];
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
 const MAX_LINKS = 12;
@@ -44,6 +46,7 @@ const supabaseEnabled = Boolean(supabaseUrl && serviceRoleKey);
 await fs.mkdir(dataDir, { recursive: true });
 await ensureJsonFile(ideasFile, []);
 await ensureJsonFile(categoriesFile, DEFAULT_CATEGORIES);
+await ensureJsonFile(teamRequestsFile, []);
 await ensureJsonFile(auditFile, []);
 
 const server = http.createServer(async (req, res) => {
@@ -69,6 +72,11 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { categories, supabaseEnabled, stores: STORES });
     }
 
+    if (url.pathname === '/api/team-requests' && req.method === 'GET') {
+      const requests = await readTeamRequests();
+      return sendJson(res, 200, { requests, supabaseEnabled: false, users: USERS, stores: STORES });
+    }
+
     if (url.pathname === '/api/ideas' && req.method === 'POST') {
       const body = await readJsonBody(req);
       const saved = await saveIdea(body);
@@ -80,6 +88,19 @@ const server = http.createServer(async (req, res) => {
       const actor = stringValue(url.searchParams.get('actor')) || '로그인 대기';
       const deleted = await deleteIdea(clientId, actor);
       return sendJson(res, 200, { deleted, supabaseEnabled });
+    }
+
+    if (url.pathname === '/api/team-requests' && req.method === 'POST') {
+      const body = await readJsonBody(req);
+      const saved = await saveTeamRequest(body);
+      return sendJson(res, 200, { request: saved, supabaseEnabled: false });
+    }
+
+    if (url.pathname.startsWith('/api/team-requests/') && req.method === 'DELETE') {
+      const id = decodeURIComponent(url.pathname.replace('/api/team-requests/', '')).trim();
+      const actor = stringValue(url.searchParams.get('actor')) || '로그인 대기';
+      const deleted = await deleteTeamRequest(id, actor);
+      return sendJson(res, 200, { deleted, supabaseEnabled: false });
     }
 
     if (url.pathname === '/api/categories' && req.method === 'POST') {
@@ -246,6 +267,77 @@ async function saveCategory(input) {
   }
   await saveLocalCategory(category);
   return category;
+}
+
+async function readTeamRequests() {
+  const text = await fs.readFile(teamRequestsFile, 'utf8');
+  const values = JSON.parse(text);
+  return normalizeTeamRequests(values).sort(sortTeamRequests);
+}
+
+async function saveTeamRequest(input) {
+  const now = new Date().toISOString();
+  const request = normalizeTeamRequest({ ...input, updated_at: now, created_at: input?.created_at || now });
+  if (!request) throw new Error('invalid_team_request');
+  const requests = await readTeamRequests();
+  const index = requests.findIndex((item) => item.id === request.id);
+  if (index >= 0) requests[index] = { ...requests[index], ...request };
+  else requests.push(request);
+  await fs.writeFile(teamRequestsFile, `${JSON.stringify(requests.sort(sortTeamRequests), null, 2)}\n`, 'utf8');
+  return request;
+}
+
+async function deleteTeamRequest(id, actor = '로그인 대기') {
+  const requestId = stringValue(id);
+  if (!requestId) throw new Error('missing_request_id');
+  const requests = await readTeamRequests();
+  const existing = requests.find((item) => item.id === requestId);
+  const nextRequests = requests.filter((item) => item.id !== requestId);
+  await fs.writeFile(teamRequestsFile, `${JSON.stringify(nextRequests.sort(sortTeamRequests), null, 2)}\n`, 'utf8');
+  await appendAuditLog({
+    action: '팀요청 삭제',
+    actor,
+    at: new Date().toISOString(),
+    client_id: requestId,
+    title: existing?.title || ''
+  });
+  return { id: requestId, deleted: true };
+}
+
+function normalizeTeamRequests(requests) {
+  return Array.isArray(requests) ? requests.map(normalizeTeamRequest).filter(Boolean) : [];
+}
+
+function normalizeTeamRequest(input) {
+  const safeInput = input && typeof input === 'object' ? input : {};
+  const now = new Date().toISOString();
+  const id = stringValue(safeInput.id || safeInput.request_id) || createRequestId();
+  const createdAt = stringValue(safeInput.created_at) || now;
+  const updatedAt = stringValue(safeInput.updated_at) || now;
+  const history = normalizeHistory(safeInput.history || safeInput.payload?.history || []);
+  const updatedBy = stringValue(safeInput.updated_by || history.at(-1)?.actor);
+  return {
+    id,
+    title: stringValue(safeInput.title).slice(0, 120),
+    requester: allowedValue(safeInput.requester, USERS),
+    assignee: allowedValue(safeInput.assignee, USERS),
+    status: allowedValue(safeInput.status, REQUEST_STATUSES) || 'open',
+    store: allowedValue(safeInput.store, STORES),
+    due_date: normalizeDateInput(safeInput.due_date),
+    description: stringValue(safeInput.description).slice(0, 2000),
+    memo: stringValue(safeInput.memo).slice(0, 1200),
+    created_by: stringValue(safeInput.created_by),
+    updated_by: updatedBy,
+    history,
+    payload: {
+      source: 'team-request-dashboard',
+      history,
+      updated_by: updatedBy
+    },
+    saved_from: 'team-request-dashboard',
+    created_at: createdAt,
+    updated_at: updatedAt
+  };
 }
 
 function normalizeIdea(input, now) {
@@ -508,6 +600,16 @@ function sortIdeas(a, b) {
   return `${b.updated_at || ''}${b.created_at || ''}`.localeCompare(`${a.updated_at || ''}${a.created_at || ''}`);
 }
 
+function sortTeamRequests(a, b) {
+  const order = { open: 0, checking: 1, done: 2 };
+  const statusDiff = (order[a.status] ?? 0) - (order[b.status] ?? 0);
+  if (statusDiff) return statusDiff;
+  if (a.due_date && b.due_date && a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date);
+  if (a.due_date && !b.due_date) return -1;
+  if (!a.due_date && b.due_date) return 1;
+  return `${b.updated_at || ''}${b.created_at || ''}`.localeCompare(`${a.updated_at || ''}${a.created_at || ''}`);
+}
+
 function normalizeTags(value) {
   if (Array.isArray(value)) return value.map(stringValue).filter(Boolean);
   return stringValue(value)
@@ -658,6 +760,10 @@ function normalizeDateInput(value) {
 
 function createClientId() {
   return `idea_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createRequestId() {
+  return `request_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function createCategoryId(level, name, parentId) {

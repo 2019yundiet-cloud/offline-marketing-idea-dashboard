@@ -393,7 +393,7 @@ button:hover {
 
 .app-tabs-desktop {
   display: inline-grid;
-  grid-template-columns: repeat(4, minmax(96px, 1fr));
+  grid-template-columns: repeat(5, minmax(86px, 1fr));
   justify-self: start;
   padding: 4px;
 }
@@ -776,6 +776,7 @@ button:hover {
 .project-board-section,
 .member-tasks-section,
 .task-filter-bar,
+.team-requests-section,
 .timeline-section,
 .progress-section {
   border: 1px solid var(--line);
@@ -823,6 +824,7 @@ button:hover {
 .project-board-section,
 .member-tasks-section,
 .task-filter-bar,
+.team-requests-section,
 .timeline-section,
 .progress-section {
   min-width: 0;
@@ -999,9 +1001,154 @@ button:hover {
 }
 
 .timeline-section,
+.team-requests-section,
 .progress-section {
   display: grid;
   gap: 18px;
+}
+
+.section-action-button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  border-color: #111;
+  border-radius: 12px;
+  background: #111;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.section-action-button:hover,
+.section-action-button:focus-visible {
+  background: #111;
+  color: #fff;
+}
+
+.request-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.request-summary-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.request-summary-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.request-summary-card strong {
+  font-size: 24px;
+  font-weight: 560;
+  line-height: 1;
+}
+
+.team-request-list {
+  display: grid;
+  gap: 10px;
+}
+
+.team-request-card,
+.team-request-empty {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.team-request-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  cursor: pointer;
+}
+
+.team-request-card:hover,
+.team-request-card:focus-visible {
+  border-color: #111;
+  background: #fafafa;
+  outline: none;
+}
+
+.team-request-card.request-status-done {
+  opacity: 0.62;
+}
+
+.team-request-card header,
+.team-request-card footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.team-request-card header > div {
+  min-width: 0;
+}
+
+.team-request-card strong,
+.team-request-card span {
+  display: block;
+}
+
+.team-request-card strong {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.team-request-card header span,
+.team-request-card footer span,
+.team-request-card p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.45;
+}
+
+.team-request-card header span {
+  margin-top: 5px;
+}
+
+.team-request-card p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.team-request-card em {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.team-request-empty {
+  display: grid;
+  gap: 8px;
+  padding: 24px;
+  color: var(--muted);
+}
+
+.team-request-empty strong {
+  color: var(--text);
+  font-size: 16px;
 }
 
 .timeline-groups {
@@ -1322,6 +1469,37 @@ body.modal-open {
 .task-modal-card > footer {
   align-items: center;
   justify-content: flex-end;
+}
+
+.team-request-modal-card {
+  width: min(100%, 720px);
+}
+
+.request-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.request-choice-grid button {
+  min-height: 40px;
+  border-radius: 12px;
+}
+
+.request-modal-footer .primary-action {
+  min-width: 136px;
+  border-color: #111;
+  border-radius: 14px;
+  background: #111;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.request-modal-footer .primary-action:hover,
+.request-modal-footer .primary-action:focus-visible {
+  background: #111;
+  color: #fff;
 }
 
 .danger-button {
@@ -2201,6 +2379,7 @@ td small {
   .store-card-grid,
   .project-group-grid,
   .member-task-grid,
+  .request-summary-grid,
   .task-filter-bar,
   .progress-columns {
     grid-template-columns: 1fr;
@@ -2264,7 +2443,7 @@ td small {
     left: 12px;
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     padding: 6px;
     border-color: rgba(17, 17, 17, 0.1);
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.14);
@@ -2272,8 +2451,8 @@ td small {
 
   .app-tabs-mobile button {
     min-height: 48px;
-    padding: 0 6px;
-    font-size: 12px;
+    padding: 0 4px;
+    font-size: 11px;
   }
 
   .sidebar {
@@ -2400,6 +2579,7 @@ td small {
   .project-board-section,
   .member-tasks-section,
   .task-filter-bar,
+  .team-requests-section,
   .timeline-section,
   .progress-section {
     padding: 18px 0;
@@ -2422,6 +2602,7 @@ td small {
   .store-war-room .section-heading,
   .project-board-section .section-heading,
   .member-tasks-section .section-heading,
+  .team-requests-section .section-heading,
   .timeline-section .section-heading,
   .progress-section .section-heading {
     padding: 0 16px;
@@ -2430,6 +2611,8 @@ td small {
   .store-card-grid,
   .project-group-grid,
   .member-task-grid,
+  .request-summary-grid,
+  .team-request-list,
   .timeline-groups,
   .progress-status-grid,
   .progress-columns {
@@ -2504,6 +2687,20 @@ td small {
 
   .task-modal-meta {
     grid-template-columns: 1fr;
+  }
+
+  .request-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-request-card header,
+  .team-request-card footer {
+    flex-direction: column;
+  }
+
+  .team-request-card em,
+  .team-request-card .due-badge {
+    width: fit-content;
   }
 
   .form-grid {

@@ -31,12 +31,24 @@ const progressSummary = document.querySelector('#progressSummary');
 const progressStatusGrid = document.querySelector('#progressStatusGrid');
 const storeProgress = document.querySelector('#storeProgress');
 const ownerProgress = document.querySelector('#ownerProgress');
+const teamRequestSummary = document.querySelector('#teamRequestSummary');
+const teamRequestList = document.querySelector('#teamRequestList');
+const newTeamRequestButton = document.querySelector('#newTeamRequestButton');
 const taskDetailModal = document.querySelector('#taskDetailModal');
 const taskModalTitle = document.querySelector('#taskModalTitle');
 const taskModalKicker = document.querySelector('#taskModalKicker');
 const taskModalBody = document.querySelector('#taskModalBody');
 const taskModalEditButton = document.querySelector('#taskModalEditButton');
 const taskModalDeleteButton = document.querySelector('#taskModalDeleteButton');
+const teamRequestModal = document.querySelector('#teamRequestModal');
+const teamRequestForm = document.querySelector('#teamRequestForm');
+const teamRequestModalTitle = document.querySelector('#teamRequestModalTitle');
+const teamRequestModalKicker = document.querySelector('#teamRequestModalKicker');
+const teamRequestDeleteButton = document.querySelector('#teamRequestDeleteButton');
+const requesterChoices = document.querySelector('#requesterChoices');
+const assigneeChoices = document.querySelector('#assigneeChoices');
+const requestStatusChoices = document.querySelector('#requestStatusChoices');
+const requestStoreChoices = document.querySelector('#requestStoreChoices');
 const categoryTree = document.querySelector('#categoryTree');
 const allScopeButton = document.querySelector('#allScopeButton');
 const allScopeCount = document.querySelector('#allScopeCount');
@@ -88,8 +100,10 @@ const labels = {
 
 const API_IDEAS_URL = 'api/ideas';
 const API_CATEGORIES_URL = 'api/categories';
+const API_TEAM_REQUESTS_URL = 'api/team-requests';
 const LOCAL_STORAGE_KEY = 'offline-marketing-ideas:v1';
 const CATEGORY_STORAGE_KEY = 'offline-marketing-categories:v1';
+const TEAM_REQUEST_STORAGE_KEY = 'fly-space-team-requests:v1';
 const CATEGORY_COLLAPSE_STORAGE_KEY = 'offline-marketing-category-collapse:v1';
 const VIEW_MODE_STORAGE_KEY = 'offline-marketing-view-mode:v1';
 const ACTOR_STORAGE_KEY = 'fly-space-current-actor:v1';
@@ -97,7 +111,7 @@ const ACTIVITY_STORAGE_KEY = 'fly-space-activity-log:v1';
 const MAX_PHOTOS = 4;
 const MAX_ORIGINAL_PHOTO_BYTES = 8 * 1024 * 1024;
 const PHOTO_TARGET_BYTES = 420 * 1024;
-const VALID_TABS = ['home', 'tasks', 'timeline', 'progress'];
+const VALID_TABS = ['home', 'tasks', 'requests', 'timeline', 'progress'];
 const USERS = ['준호', '동원', '보미', '상준', '유민'];
 const TEAMS = [
   { name: '기획/실행팀', members: ['동원', '상준', '유민'] },
@@ -105,6 +119,12 @@ const TEAMS = [
 ];
 const STORES = ['머문래', '갤러리문래'];
 const WORK_TYPES = ['아이디어', '기획안', '프로젝트', '업무'];
+const REQUEST_STATUSES = [
+  { value: 'open', label: '요청' },
+  { value: 'checking', label: '확인중' },
+  { value: 'done', label: '완료' }
+];
+const REQUEST_STORE_OPTIONS = ['전체', ...STORES];
 const DUE_FILTERS = [
   { value: 'all', label: '전체' },
   { value: 'overdue', label: '지연' },
@@ -128,6 +148,7 @@ const state = {
   currentAttachments: [],
   categories: [],
   ideas: [],
+  teamRequests: [],
   selectedScope: { kind: 'all', major: '', subcategory: '', store: '' },
   collapsedMajors: readCollapsedMajors(),
   activeTab: readActiveTab(),
@@ -138,6 +159,7 @@ const state = {
   pendingRequest: Promise.resolve(),
   lastSavedSignature: '',
   modalIdeaId: '',
+  currentRequestId: '',
   editorMode: 'create',
   currentHistory: []
 };
@@ -179,7 +201,7 @@ function renderAppTabs() {
 
 async function initialize() {
   bindAutosave();
-  await Promise.all([loadIdeas(), loadCategories()]);
+  await Promise.all([loadIdeas(), loadCategories(), loadTeamRequests()]);
   state.categories = mergeCategories(state.categories);
   ensureHashTab();
   populateTaskFilters();
@@ -273,6 +295,19 @@ function bindAutosave() {
     memberTaskGroups.addEventListener('click', handleMemberTaskClick);
     memberTaskGroups.addEventListener('keydown', handleMemberTaskKeydown);
   }
+  if (newTeamRequestButton) {
+    newTeamRequestButton.addEventListener('click', () => openTeamRequestModal());
+  }
+  if (teamRequestList) {
+    teamRequestList.addEventListener('click', handleTeamRequestListClick);
+    teamRequestList.addEventListener('keydown', handleTeamRequestListKeydown);
+  }
+  if (teamRequestModal) {
+    teamRequestModal.addEventListener('click', handleTeamRequestModalClick);
+  }
+  if (teamRequestForm) {
+    teamRequestForm.addEventListener('submit', saveTeamRequestFromModal);
+  }
   if (taskDetailModal) {
     taskDetailModal.addEventListener('click', handleTaskModalClick);
     document.addEventListener('keydown', handleTaskModalKeydown);
@@ -337,6 +372,22 @@ function bindChoiceControls() {
     form.elements.status.value = normalizeStatus(value);
     renderChoiceControls();
     scheduleSave();
+  });
+  bindChoiceGroup(requesterChoices, (value) => {
+    teamRequestForm.elements.requester.value = value;
+    renderRequestChoiceControls();
+  });
+  bindChoiceGroup(assigneeChoices, (value) => {
+    teamRequestForm.elements.assignee.value = value;
+    renderRequestChoiceControls();
+  });
+  bindChoiceGroup(requestStatusChoices, (value) => {
+    teamRequestForm.elements.status.value = normalizeRequestStatus(value);
+    renderRequestChoiceControls();
+  });
+  bindChoiceGroup(requestStoreChoices, (value) => {
+    teamRequestForm.elements.store.value = value === '전체' ? '' : value;
+    renderRequestChoiceControls();
   });
 }
 
@@ -425,6 +476,17 @@ async function loadCategories() {
     state.categories = mergeCategories(readBrowserCategories());
   }
   saveBrowserCategories(state.categories);
+}
+
+async function loadTeamRequests() {
+  try {
+    const response = await fetch(API_TEAM_REQUESTS_URL);
+    if (!response.ok) throw new Error('team_requests_unavailable');
+    const payload = await response.json();
+    state.teamRequests = normalizeTeamRequests(payload.requests || []);
+  } catch {
+    state.teamRequests = readBrowserTeamRequests();
+  }
 }
 
 function scheduleSave() {
@@ -646,6 +708,7 @@ function render() {
   renderStageTabs();
   renderProjectGroups();
   renderMemberTasks();
+  renderTeamRequests();
   renderRecords();
   renderTimeline();
   renderProgress();
@@ -830,6 +893,308 @@ function renderMemberTaskCard(idea) {
       </footer>
     </article>
   `;
+}
+
+function renderTeamRequests() {
+  if (!teamRequestSummary || !teamRequestList) return;
+  const requests = sortedTeamRequests(state.teamRequests);
+  const counts = requestSummaryCounts(requests);
+  teamRequestSummary.innerHTML = [
+    { label: '요청', value: counts.open },
+    { label: '확인중', value: counts.checking },
+    { label: '완료', value: counts.done },
+    { label: '지연', value: counts.overdue }
+  ].map((item) => `
+    <article class="request-summary-card">
+      <span>${escapeHtml(item.label)}</span>
+      <strong>${item.value.toLocaleString('ko-KR')}</strong>
+    </article>
+  `).join('');
+
+  if (!requests.length) {
+    teamRequestList.innerHTML = `
+      <div class="team-request-empty">
+        <strong>아직 팀요청이 없습니다.</strong>
+        <span>요청 추가를 눌러 확인이 필요한 일을 남기면 이곳에 정리됩니다.</span>
+      </div>
+    `;
+    return;
+  }
+
+  teamRequestList.innerHTML = requests.map(renderTeamRequestCard).join('');
+}
+
+function requestSummaryCounts(requests) {
+  return requests.reduce((acc, request) => {
+    const status = normalizeRequestStatus(request.status);
+    acc[status] = (acc[status] || 0) + 1;
+    if (isRequestOverdue(request)) acc.overdue += 1;
+    return acc;
+  }, { open: 0, checking: 0, done: 0, overdue: 0 });
+}
+
+function sortedTeamRequests(requests) {
+  const statusOrder = { open: 0, checking: 1, done: 2 };
+  return normalizeTeamRequests(requests).sort((a, b) => {
+    const statusDiff = statusOrder[normalizeRequestStatus(a.status)] - statusOrder[normalizeRequestStatus(b.status)];
+    if (statusDiff) return statusDiff;
+    const dueA = normalizeDateInput(a.due_date || '');
+    const dueB = normalizeDateInput(b.due_date || '');
+    if (dueA && dueB && dueA !== dueB) return dueA.localeCompare(dueB);
+    if (dueA && !dueB) return -1;
+    if (!dueA && dueB) return 1;
+    return `${b.updated_at || ''}${b.created_at || ''}`.localeCompare(`${a.updated_at || ''}${a.created_at || ''}`);
+  });
+}
+
+function renderTeamRequestCard(request) {
+  const status = normalizeRequestStatus(request.status);
+  const assigneeTeam = teamNameForOwner(request.assignee);
+  const people = `${request.requester || '요청자 미정'} → ${request.assignee || '담당자 미정'}`;
+  return `
+    <article class="team-request-card request-status-${escapeHtml(status)}" data-team-request="${escapeHtml(request.id)}" role="button" tabindex="0">
+      <header>
+        <div>
+          <strong>${escapeHtml(request.title || '제목 없음')}</strong>
+          <span>${escapeHtml(people)}</span>
+        </div>
+        <em>${escapeHtml(requestStatusLabel(status))}</em>
+      </header>
+      ${request.description ? `<p>${escapeHtml(summaryText(request.description))}</p>` : ''}
+      <footer>
+        <span>${escapeHtml(taskMeta([assigneeTeam, request.store || '전체 매장']))}</span>
+        ${renderRequestDueBadge(request)}
+      </footer>
+    </article>
+  `;
+}
+
+function handleTeamRequestListClick(event) {
+  const card = event.target.closest('[data-team-request]');
+  if (!card) return;
+  const request = state.teamRequests.find((item) => item.id === card.dataset.teamRequest);
+  if (request) openTeamRequestModal(request);
+}
+
+function handleTeamRequestListKeydown(event) {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const card = event.target.closest('[data-team-request]');
+  if (!card) return;
+  event.preventDefault();
+  const request = state.teamRequests.find((item) => item.id === card.dataset.teamRequest);
+  if (request) openTeamRequestModal(request);
+}
+
+function openTeamRequestModal(request = null) {
+  if (!teamRequestModal || !teamRequestForm) return;
+  const actor = currentActor();
+  const actorName = USERS.includes(actor) ? actor : '';
+  state.currentRequestId = request?.id || createRequestId();
+  teamRequestForm.reset();
+  teamRequestForm.elements.title.value = request?.title || '';
+  teamRequestForm.elements.requester.value = request?.requester || actorName || '';
+  teamRequestForm.elements.assignee.value = request?.assignee || '';
+  teamRequestForm.elements.status.value = normalizeRequestStatus(request?.status || 'open');
+  teamRequestForm.elements.store.value = request?.store || '';
+  teamRequestForm.elements.due_date.value = normalizeDateInput(request?.due_date || '');
+  teamRequestForm.elements.description.value = request?.description || '';
+  teamRequestForm.elements.memo.value = request?.memo || '';
+  if (teamRequestModalTitle) teamRequestModalTitle.textContent = request ? '요청 수정' : '요청 추가';
+  if (teamRequestModalKicker) {
+    teamRequestModalKicker.textContent = request
+      ? taskMeta([requestStatusLabel(request.status), request.assignee || '담당자 미정'])
+      : '팀요청';
+  }
+  if (teamRequestDeleteButton) teamRequestDeleteButton.hidden = !request;
+  renderRequestChoiceControls();
+  teamRequestModal.hidden = false;
+  teamRequestModal.classList.add('open');
+  document.body.classList.add('modal-open');
+  requestAnimationFrame(() => teamRequestForm.elements.title?.focus());
+}
+
+function closeTeamRequestModal() {
+  if (!teamRequestModal) return;
+  teamRequestModal.classList.remove('open');
+  teamRequestModal.hidden = true;
+  document.body.classList.remove('modal-open');
+  state.currentRequestId = '';
+}
+
+function handleTeamRequestModalClick(event) {
+  if (event.target.closest('[data-request-modal-close]')) {
+    closeTeamRequestModal();
+    return;
+  }
+  if (event.target === teamRequestDeleteButton || event.target.closest('#teamRequestDeleteButton')) {
+    deleteCurrentTeamRequest();
+  }
+}
+
+async function saveTeamRequestFromModal(event) {
+  event.preventDefault();
+  const request = collectTeamRequest();
+  if (!request.title && !request.description) {
+    setSaveState('idle', '입력 필요');
+    teamRequestForm.elements.title?.focus();
+    return;
+  }
+  setSaveState('saving', '저장 중');
+  try {
+    const response = await fetch(API_TEAM_REQUESTS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    if (!response.ok) throw new Error('save_failed');
+    const payload = await response.json();
+    upsertTeamRequest(payload.request || request);
+    storageMode.textContent = payload.supabaseEnabled ? 'Supabase 연결' : '로컬 저장';
+  } catch {
+    upsertTeamRequest(saveBrowserTeamRequest(request));
+    storageMode.textContent = '브라우저 저장';
+  }
+  setSaveState('saved', '저장됨');
+  closeTeamRequestModal();
+  render();
+}
+
+async function deleteCurrentTeamRequest() {
+  const request = state.teamRequests.find((item) => item.id === state.currentRequestId);
+  if (!request) return;
+  const ok = window.confirm(`"${request.title || '제목 없음'}" 요청을 삭제할까요?`);
+  if (!ok) return;
+  setSaveState('saving', '삭제 중');
+  try {
+    const response = await fetch(`${API_TEAM_REQUESTS_URL}/${encodeURIComponent(request.id)}?actor=${encodeURIComponent(currentActor())}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('delete_failed');
+  } catch {
+    deleteBrowserTeamRequest(request.id);
+    storageMode.textContent = '브라우저 저장';
+  }
+  state.teamRequests = state.teamRequests.filter((item) => item.id !== request.id);
+  closeTeamRequestModal();
+  setSaveState('saved', '삭제됨');
+  render();
+}
+
+function collectTeamRequest() {
+  const data = new FormData(teamRequestForm);
+  const existing = state.teamRequests.find((item) => item.id === state.currentRequestId);
+  const now = new Date().toISOString();
+  const actor = currentActor();
+  const action = existing ? '수정' : '생성';
+  const history = [
+    ...normalizeRequestHistory(existing?.history || existing?.payload?.history || []),
+    { action, actor, at: now }
+  ].slice(-50);
+  return normalizeTeamRequest({
+    id: state.currentRequestId || createRequestId(),
+    title: data.get('title') || '',
+    requester: data.get('requester') || '',
+    assignee: data.get('assignee') || '',
+    status: data.get('status') || 'open',
+    store: data.get('store') || '',
+    due_date: data.get('due_date') || '',
+    description: data.get('description') || '',
+    memo: data.get('memo') || '',
+    created_by: existing?.created_by || actor,
+    updated_by: actor,
+    history,
+    created_at: existing?.created_at || now,
+    updated_at: now
+  });
+}
+
+function upsertTeamRequest(request) {
+  const normalized = normalizeTeamRequest(request);
+  if (!normalized) return;
+  const index = state.teamRequests.findIndex((item) => item.id === normalized.id);
+  if (index >= 0) state.teamRequests[index] = { ...state.teamRequests[index], ...normalized };
+  else state.teamRequests.unshift(normalized);
+  state.teamRequests = sortedTeamRequests(state.teamRequests);
+}
+
+function renderRequestChoiceControls() {
+  if (!teamRequestForm) return;
+  renderChoiceButtonGroup(requesterChoices, USERS, teamRequestForm.elements.requester?.value || '');
+  renderChoiceButtonGroup(assigneeChoices, USERS, teamRequestForm.elements.assignee?.value || '');
+  renderChoiceButtonGroup(
+    requestStatusChoices,
+    REQUEST_STATUSES.map((status) => status.value),
+    normalizeRequestStatus(teamRequestForm.elements.status?.value || 'open'),
+    Object.fromEntries(REQUEST_STATUSES.map((status) => [status.value, status.label]))
+  );
+  renderChoiceButtonGroup(requestStoreChoices, REQUEST_STORE_OPTIONS, teamRequestForm.elements.store?.value || '전체');
+}
+
+function normalizeTeamRequests(requests) {
+  return Array.isArray(requests) ? requests.map(normalizeTeamRequest).filter(Boolean) : [];
+}
+
+function normalizeTeamRequest(request) {
+  if (!request || typeof request !== 'object') return null;
+  const id = String(request.id || request.request_id || '').trim() || createRequestId();
+  const requester = USERS.includes(request.requester) ? request.requester : '';
+  const assignee = USERS.includes(request.assignee) ? request.assignee : '';
+  const store = STORES.includes(request.store) ? request.store : '';
+  return {
+    id,
+    title: String(request.title || '').trim().slice(0, 120),
+    requester,
+    assignee,
+    status: normalizeRequestStatus(request.status),
+    store,
+    due_date: normalizeDateInput(request.due_date || ''),
+    description: String(request.description || '').trim().slice(0, 2000),
+    memo: String(request.memo || '').trim().slice(0, 1200),
+    created_by: String(request.created_by || '').trim(),
+    updated_by: String(request.updated_by || '').trim(),
+    history: normalizeRequestHistory(request.history || request.payload?.history || []),
+    payload: request.payload || {},
+    created_at: String(request.created_at || ''),
+    updated_at: String(request.updated_at || '')
+  };
+}
+
+function normalizeRequestHistory(history) {
+  if (!Array.isArray(history)) return [];
+  return history.map((item) => ({
+    action: String(item?.action || '').trim(),
+    actor: String(item?.actor || '').trim() || '로그인 대기',
+    at: String(item?.at || '').trim()
+  })).filter((item) => item.action && item.at);
+}
+
+function normalizeRequestStatus(value) {
+  const status = String(value || '').trim();
+  return REQUEST_STATUSES.some((item) => item.value === status) ? status : 'open';
+}
+
+function requestStatusLabel(value) {
+  return REQUEST_STATUSES.find((item) => item.value === normalizeRequestStatus(value))?.label || '요청';
+}
+
+function isRequestOverdue(request) {
+  const dueDate = normalizeDateInput(request.due_date || '');
+  return Boolean(dueDate && normalizeRequestStatus(request.status) !== 'done' && dateOnlyTime(dueDate) < todayTime());
+}
+
+function renderRequestDueBadge(request) {
+  const dueDate = normalizeDateInput(request.due_date || '');
+  if (!dueDate) return '<span class="due-badge muted">기한 없음</span>';
+  const tone = normalizeRequestStatus(request.status) === 'done'
+    ? 'done'
+    : isRequestOverdue(request)
+      ? 'overdue'
+      : dateOnlyTime(dueDate) === todayTime()
+        ? 'today'
+        : 'muted';
+  return `<span class="due-badge ${escapeHtml(tone)}">${escapeHtml(formatDate(dueDate))}</span>`;
+}
+
+function createRequestId() {
+  return `request_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function renderProjectTask(idea) {
@@ -1368,6 +1733,10 @@ async function deleteCurrentModalIdea() {
 function handleTaskModalKeydown(event) {
   if (event.key === 'Escape' && taskDetailModal && !taskDetailModal.hidden) {
     closeTaskModal();
+    return;
+  }
+  if (event.key === 'Escape' && teamRequestModal && !teamRequestModal.hidden) {
+    closeTeamRequestModal();
     return;
   }
   if (event.key === 'Escape' && inputModal && !inputModal.hidden) {
@@ -2510,6 +2879,39 @@ function deleteBrowserIdea(clientId) {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(ideas));
   } catch {
     // Deleting from browser storage is best-effort when the API is unavailable.
+  }
+}
+
+function readBrowserTeamRequests() {
+  try {
+    const raw = localStorage.getItem(TEAM_REQUEST_STORAGE_KEY);
+    return sortedTeamRequests(raw ? JSON.parse(raw) : []);
+  } catch {
+    return [];
+  }
+}
+
+function saveBrowserTeamRequest(request) {
+  const now = new Date().toISOString();
+  const normalized = normalizeTeamRequest({
+    ...request,
+    created_at: request.created_at || now,
+    updated_at: now
+  });
+  const requests = readBrowserTeamRequests();
+  const index = requests.findIndex((item) => item.id === normalized.id);
+  if (index >= 0) requests[index] = { ...requests[index], ...normalized };
+  else requests.unshift(normalized);
+  localStorage.setItem(TEAM_REQUEST_STORAGE_KEY, JSON.stringify(sortedTeamRequests(requests)));
+  return normalized;
+}
+
+function deleteBrowserTeamRequest(id) {
+  try {
+    const requests = readBrowserTeamRequests().filter((request) => request.id !== id);
+    localStorage.setItem(TEAM_REQUEST_STORAGE_KEY, JSON.stringify(requests));
+  } catch {
+    // Team request deletion falls back silently when browser storage is unavailable.
   }
 }
 

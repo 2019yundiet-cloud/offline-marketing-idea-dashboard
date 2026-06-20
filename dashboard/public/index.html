@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#ffffff">
     <title>Fly Space</title>
     <link rel="icon" type="image/svg+xml" href="financier.svg">
-    <link rel="stylesheet" href="styles.css?v=20260620-worktypebottomsave">
+    <link rel="stylesheet" href="styles.css?v=20260620-teamrequests">
   </head>
   <body>
     <div class="app-shell">
@@ -43,6 +43,7 @@
         <nav class="app-tabs app-tabs-desktop" aria-label="주요 화면">
           <button type="button" data-app-tab="home" class="active">홈</button>
           <button type="button" data-app-tab="tasks">개별업무</button>
+          <button type="button" data-app-tab="requests">팀요청</button>
           <button type="button" data-app-tab="timeline">타임라인</button>
           <button type="button" data-app-tab="progress">진행상황</button>
         </nav>
@@ -249,6 +250,21 @@
         </section>
         </section>
 
+        <section id="requestsPanel" class="tab-panel" data-tab-panel="requests" hidden>
+          <section class="team-requests-section" aria-label="팀요청 사항">
+            <div class="section-heading">
+              <div>
+                <p class="section-mode">확인 요청</p>
+                <h3>팀요청</h3>
+                <span>팀원이 팀원에게 확인을 요청한 일을 기록하고 관리합니다.</span>
+              </div>
+              <button type="button" id="newTeamRequestButton" class="section-action-button">요청 추가</button>
+            </div>
+            <div id="teamRequestSummary" class="request-summary-grid"></div>
+            <div id="teamRequestList" class="team-request-list"></div>
+          </section>
+        </section>
+
         <section id="timelinePanel" class="tab-panel" data-tab-panel="timeline" hidden>
           <section class="timeline-section">
             <div class="section-heading">
@@ -289,6 +305,7 @@
       <nav class="app-tabs app-tabs-mobile" aria-label="하단 화면 이동">
         <button type="button" data-app-tab="home" class="active">홈</button>
         <button type="button" data-app-tab="tasks">개별업무</button>
+        <button type="button" data-app-tab="requests">팀요청</button>
         <button type="button" data-app-tab="timeline">타임라인</button>
         <button type="button" data-app-tab="progress">진행상황</button>
       </nav>
@@ -310,7 +327,84 @@
           </footer>
         </section>
       </div>
+
+      <div id="teamRequestModal" class="task-modal" hidden role="dialog" aria-modal="true" aria-labelledby="teamRequestModalTitle">
+        <button type="button" class="task-modal-backdrop" data-request-modal-close aria-label="팀요청 닫기"></button>
+        <form id="teamRequestForm" class="task-modal-card team-request-modal-card" autocomplete="off">
+          <header>
+            <div>
+              <p id="teamRequestModalKicker">팀요청</p>
+              <h3 id="teamRequestModalTitle">요청 추가</h3>
+            </div>
+            <button type="button" data-request-modal-close>닫기</button>
+          </header>
+          <div class="request-form-grid">
+            <label class="wide">
+              <span>요청 제목</span>
+              <input name="title" type="text" placeholder="예: 7월 캠페인 문구 확인">
+            </label>
+            <div class="form-control choice-backed-field">
+              <span>요청자</span>
+              <select name="requester" hidden>
+                <option value="">선택</option>
+                <option value="준호">준호</option>
+                <option value="동원">동원</option>
+                <option value="보미">보미</option>
+                <option value="상준">상준</option>
+                <option value="유민">유민</option>
+              </select>
+              <div id="requesterChoices" class="choice-grid request-choice-grid" aria-label="요청자 선택"></div>
+            </div>
+            <div class="form-control choice-backed-field">
+              <span>확인 담당자</span>
+              <select name="assignee" hidden>
+                <option value="">선택</option>
+                <option value="준호">준호</option>
+                <option value="동원">동원</option>
+                <option value="보미">보미</option>
+                <option value="상준">상준</option>
+                <option value="유민">유민</option>
+              </select>
+              <div id="assigneeChoices" class="choice-grid request-choice-grid" aria-label="확인 담당자 선택"></div>
+            </div>
+            <div class="form-control choice-backed-field">
+              <span>상태</span>
+              <select name="status" hidden>
+                <option value="open">요청</option>
+                <option value="checking">확인중</option>
+                <option value="done">완료</option>
+              </select>
+              <div id="requestStatusChoices" class="choice-grid request-choice-grid" aria-label="요청 상태 선택"></div>
+            </div>
+            <div class="form-control choice-backed-field">
+              <span>매장</span>
+              <select name="store" hidden>
+                <option value="">전체</option>
+                <option value="머문래">머문래</option>
+                <option value="갤러리문래">갤러리문래</option>
+              </select>
+              <div id="requestStoreChoices" class="choice-grid request-choice-grid" aria-label="매장 선택"></div>
+            </div>
+            <label>
+              <span>기한</span>
+              <input name="due_date" type="date">
+            </label>
+            <label class="wide">
+              <span>요청 내용</span>
+              <textarea name="description" rows="5" placeholder="확인해 줬으면 하는 내용과 필요한 기준을 적어주세요."></textarea>
+            </label>
+            <label class="wide">
+              <span>메모</span>
+              <textarea name="memo" rows="3" placeholder="확인 결과나 추가 메모"></textarea>
+            </label>
+          </div>
+          <footer class="request-modal-footer">
+            <button type="button" id="teamRequestDeleteButton" class="danger-button">삭제</button>
+            <button type="submit" id="teamRequestSaveButton" class="primary-action">저장</button>
+          </footer>
+        </form>
+      </div>
     </div>
-    <script src="app.js?v=20260620-worktypebottomsave" type="module"></script>
+    <script src="app.js?v=20260620-teamrequests" type="module"></script>
   </body>
 </html>
